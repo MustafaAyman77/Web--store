@@ -11,6 +11,7 @@ export function recommendations(req, res) {
   res.json({
     success: true,
     data: getRecommendations({
+      customerId: req.customer ? req.customer.id : undefined,
       customerPhone: q.customerPhone ? String(q.customerPhone).trim().slice(0, 20) : undefined,
       cartIds,
       category: q.category ? String(q.category).slice(0, 40) : undefined,

@@ -9,6 +9,8 @@ import { toPublicProduct } from "../controllers/products.controller.js";
 import { allowedNext, ORDER_STATUSES, getOrderByIdOrNumber } from "./order.service.js";
 import { categoryExists } from "./category.service.js";
 import { getPurchaseHistory } from "./customer-history.service.js";
+import { accountStatusOf } from "./customer.service.js";
+import { revokeAllSessions } from "./customer-session.service.js";
 
 /* ================= نطاق "اليوم" بتوقيت القاهرة ================= */
 
@@ -120,7 +122,8 @@ export function listCustomers({ search, sort, page, limit } = {}) {
     : sort === "top_orders" ? "ordersCount DESC" : "c.created_at DESC";
   const rows = db
     .prepare(
-      `SELECT c.id, c.name, c.phone, c.status, c.created_at AS createdAt,
+      `SELECT c.id, c.name, c.phone, c.status, c.account_enabled AS accountEnabled,
+              c.phone_verified AS phoneVerified, c.last_login_at AS lastLoginAt, c.created_at AS createdAt,
               COUNT(o.id) AS ordersCount,
               COALESCE(SUM(CASE WHEN o.status != 'cancelled' THEN o.total ELSE 0 END), 0) AS totalSpent,
               MAX(o.created_at) AS lastOrderAt
@@ -131,7 +134,13 @@ export function listCustomers({ search, sort, page, limit } = {}) {
   const totalRow = db
     .prepare(`SELECT COUNT(*) AS count FROM customers c ${where};`)
     .get(...vals);
-  return { customers: rows, total: totalRow.count, limit: lim, offset, page: p };
+  const customers = rows.map((r) => ({
+    ...r,
+    accountEnabled: Number(r.accountEnabled) === 1,
+    phoneVerified: Number(r.phoneVerified) === 1,
+    accountStatus: accountStatusOf({ status: r.status, account_enabled: r.accountEnabled }),
+  }));
+  return { customers, total: totalRow.count, limit: lim, offset, page: p };
 }
 
 export function setCustomerStatus(id, body, actor) {
@@ -147,6 +156,9 @@ export function setCustomerStatus(id, body, actor) {
     patch.status = st;
   }
   if (body?.notes !== undefined) patch.notes = String(body.notes ?? "").trim().slice(0, 500);
+  if (body?.account_enabled !== undefined) {
+    patch.account_enabled = body.account_enabled ? 1 : 0;
+  }
   const keys = Object.keys(patch);
   if (keys.length) {
     const set = keys.map((k) => `${k} = ?`).join(", ");
@@ -154,6 +166,10 @@ export function setCustomerStatus(id, body, actor) {
       .run(...keys.map((k) => patch[k]), id);
   }
   if (keys.length) {
+    // تعطيل الحساب أو حظر العميل = إبطال كل جلساته فورًا
+    if (patch.account_enabled === 0 || patch.status === "blocked") {
+      revokeAllSessions(id);
+    }
     logAudit({ actor, action: "customer.update", entity: "customer", entityId: id, meta: { changes: patch } });
   }
   return getCustomerDetails(id);
@@ -162,7 +178,7 @@ export function setCustomerStatus(id, body, actor) {
 export function getCustomerDetails(id) {
   const db = getDb();
   const customer = db
-    .prepare("SELECT id, name, phone, email, address, area, landmark, notes, status, created_at AS createdAt FROM customers WHERE id = ?;")
+    .prepare("SELECT id, name, phone, email, address, area, landmark, notes, status, account_enabled AS accountEnabled, phone_verified AS phoneVerified, last_login_at AS lastLoginAt, created_at AS createdAt FROM customers WHERE id = ?;")
     .get(id);
   if (!customer) throw ApiError.notFound("CUSTOMER_NOT_FOUND", "العميل غير موجود.");
   const orders = db
@@ -177,6 +193,9 @@ export function getCustomerDetails(id) {
     .filter((o) => o.status !== "cancelled")
     .reduce((s, o) => s + Number(o.total), 0);
   const history = getPurchaseHistory(id);
+  customer.accountEnabled = Number(customer.accountEnabled) === 1;
+  customer.phoneVerified = Number(customer.phoneVerified) === 1;
+  customer.accountStatus = accountStatusOf({ status: customer.status, account_enabled: customer.accountEnabled ? 1 : 0 });
   return {
     ...customer, ordersCount: orders.length, totalSpent: spent, orders,
     topProducts: history.products.slice(0, 10),

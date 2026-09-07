@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>إتمام الطلب | أسواق البسيط</title>
-  <meta name="description" content="إتمام طلبك من أسواق البسيط — مغاغة. أدخل بياناتك واختار طريقة الاستلام وراجع طلبك." />
+  <title>حسابي | أسواق البسيط</title>
+  <meta name="description" content="حسابك في أسواق البسيط — بياناتك وطلباتك وإعادة الطلب." />
   <meta name="theme-color" content="#15803d" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2316a34a'/%3E%3Cpath d='M16 20h8l4 16h16l4-12H24' stroke='white' stroke-width='4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='28' cy='46' r='3.4' fill='white'/%3E%3Ccircle cx='42' cy='46' r='3.4' fill='white'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="css/variables.css" />
@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="css/sections.css" />
   <link rel="stylesheet" href="css/shop.css" />
   <link rel="stylesheet" href="css/checkout.css" />
+  <link rel="stylesheet" href="css/account.css" />
 </head>
 <body>
 
@@ -64,104 +65,9 @@
       <nav class="crumbs" aria-label="مسار الصفحة">
         <a href="index.html">الرئيسية</a>
         <span aria-hidden="true">←</span>
-        <a href="products.html">المنتجات</a>
-        <span aria-hidden="true">←</span>
-        <span aria-current="page">إتمام الطلب</span>
+        <span aria-current="page">حسابي</span>
       </nav>
-
-      <div class="co-head reveal">
-        <h1>إتمام الطلب 🧾</h1>
-        <p>راجع طلبك واكتب بياناتك واختار طريقة الاستلام.</p>
-      </div>
-
-      <ol class="steps reveal" aria-label="خطوات إتمام الطلب">
-        <li class="done"><span class="step-n" aria-hidden="true">✓</span><span>السلة</span></li>
-        <li class="current" aria-current="step"><span class="step-n" aria-hidden="true">2</span><span>البيانات</span></li>
-        <li><span class="step-n" aria-hidden="true">3</span><span>المراجعة</span></li>
-        <li><span class="step-n" aria-hidden="true">4</span><span>التأكيد</span></li>
-      </ol>
-
-      <!-- حالة السلة الفارغة -->
-      <div class="co-empty" id="emptyState" hidden>
-        <span class="co-empty-icon" aria-hidden="true">🛒</span>
-        <h2>السلة فارغة</h2>
-        <p>أضف بعض المنتجات أولًا.</p>
-        <a class="btn btn-primary btn-lg" href="products.html">تصفح المنتجات ←</a>
-      </div>
-
-      <!-- محتوى إتمام الطلب -->
-      <div class="co-layout" id="coContent" hidden>
-        <aside class="co-card co-side" id="coSummary" aria-label="ملخص طلبك" aria-live="polite"></aside>
-
-        <div class="co-stack">
-          <form class="co-card" id="checkoutForm" novalidate aria-label="بيانات إتمام الطلب">
-            <h3>👤 بياناتك</h3>
-            <div class="form-grid">
-              <div class="field">
-                <label for="coName">الاسم الكامل <i>*</i></label>
-                <input id="coName" name="name" type="text" placeholder="اكتب اسمك" autocomplete="name" />
-              </div>
-              <div class="field">
-                <label for="coPhone">رقم الهاتف <i>*</i></label>
-                <input id="coPhone" name="phone" type="tel" inputmode="numeric" placeholder="01xxxxxxxxx" autocomplete="tel" dir="ltr" style="text-align:right" />
-              </div>
-
-              <fieldset style="border:0">
-                <legend style="font-size:.85rem;font-weight:800;margin-bottom:.5rem">🚚 طريقة استلام الطلب</legend>
-                <div class="fulfill-grid">
-                  <label class="fulfill-card is-selected">
-                    <input type="radio" name="fulfill" value="delivery" checked />
-                    <span class="fc-icon" aria-hidden="true">🚚</span>
-                    <span class="fc-text">
-                      <strong>توصيل للمنزل</strong>
-                      <small>الخدمة تخضع لتأكيد المحل.</small>
-                    </span>
-                  </label>
-                  <label class="fulfill-card">
-                    <input type="radio" name="fulfill" value="pickup" />
-                    <span class="fc-icon" aria-hidden="true">🏪</span>
-                    <span class="fc-text">
-                      <strong>استلام من المحل</strong>
-                      <small>شارع الحجاز — مغاغة.</small>
-                    </span>
-                  </label>
-                </div>
-              </fieldset>
-
-              <div class="address-group" id="addressGroup">
-                <div class="field">
-                  <label for="coAddress">العنوان <i>*</i></label>
-                  <input id="coAddress" name="address" type="text" placeholder="اكتب عنوان التوصيل" autocomplete="street-address" />
-                </div>
-                <div class="field">
-                  <label for="coArea">المنطقة / الحي</label>
-                  <input id="coArea" name="area" type="text" placeholder="مثال: مغاغة" autocomplete="address-level2" />
-                </div>
-                <div class="field">
-                  <label for="coLandmark">علامة مميزة للعنوان</label>
-                  <input id="coLandmark" name="landmark" type="text" placeholder="بجوار..." />
-                </div>
-              </div>
-
-              <div class="field">
-                <label for="coNotes">ملاحظات على الطلب</label>
-                <textarea id="coNotes" name="notes" placeholder="أي ملاحظات إضافية على الطلب؟"></textarea>
-              </div>
-            </div>
-          </form>
-
-          <section class="co-card" id="coReview" aria-label="راجع طلبك" aria-live="polite"></section>
-          <section class="co-card" id="coRecs" aria-label="نسيت حاجة؟" hidden>
-            <h3>نسيت حاجة؟ 👀</h3>
-            <div class="rec-grid rec-grid-sm" id="coRecsGrid"></div>
-          </section>
-
-          <div class="form-error" id="formError" role="alert" hidden></div>
-
-          <button type="submit" form="checkoutForm" class="btn btn-primary btn-block btn-lg" id="confirmBtn">✅ تأكيد الطلب</button>
-          <p class="form-hint">💡 نسخة تجريبية — سيتم تسجيل طلبك محليًا فقط في هذه المرحلة.</p>
-        </div>
-      </div>
+      <div id="accountRoot" aria-live="polite"></div>
     </div>
   </main>
 
@@ -250,8 +156,7 @@
   <script src="js/recs.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/ui.js"></script>
-  <script src="js/orders.js"></script>
-  <script src="js/checkout.js"></script>
+  <script src="js/account.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

@@ -21,6 +21,15 @@ export class ApiError extends Error {
   static conflict(code, message) {
     return new ApiError(409, code, message);
   }
+  static forbidden(code, message) {
+    return new ApiError(403, code, message);
+  }
+  static tooManyRequests(code, message) {
+    return new ApiError(429, code, message);
+  }
+  static internal(code, message) {
+    return new ApiError(500, code, message);
+  }
 }
 
 export default ApiError;

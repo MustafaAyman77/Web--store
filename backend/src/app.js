@@ -9,11 +9,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { env } from "./config/env.js";
 import { notFound, errorHandler } from "./middleware/error.middleware.js";
+import { securityHeaders } from "./middleware/security.middleware.js";
+import { attachCustomer } from "./middleware/customer-auth.middleware.js";
 import productsRoutes from "./routes/products.routes.js";
 import ordersRoutes from "./routes/orders.routes.js";
 import customersRoutes from "./routes/customers.routes.js";
 import categoriesRoutes from "./routes/categories.routes.js";
 import recommendationsRoutes from "./routes/recommendations.routes.js";
+import authRoutes from "./routes/auth.routes.js";
+import meRoutes from "./routes/me.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -23,6 +27,7 @@ export function createApp() {
   const app = express();
 
   app.disable("x-powered-by");
+  app.use(securityHeaders);
   app.use(express.json({ limit: "256kb" }));
 
   // CORS: نفس الـ Origin دائمًا مسموح + Origins إضافية من الإعدادات
@@ -55,7 +60,9 @@ export function createApp() {
   app.use("/api/orders", ordersRoutes);
   app.use("/api/customers", customersRoutes);
   app.use("/api/categories", categoriesRoutes);
-  app.use("/api/recommendations", recommendationsRoutes);
+  app.use("/api/recommendations", attachCustomer, recommendationsRoutes);
+  app.use("/api/auth", authRoutes);
+  app.use("/api/me", attachCustomer, meRoutes);
   app.use("/api/admin", adminRoutes);
 
   // ---------- لوحة التحكم (SPA — كل مسارات /admin تخدم index.html) ----------

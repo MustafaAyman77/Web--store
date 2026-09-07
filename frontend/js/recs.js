@@ -46,7 +46,9 @@
     const mode = await Api.resolveMode();
     if (mode !== "backend") return null;
     const q = new URLSearchParams();
-    const phone = withPhone === false ? "" : getPhone();
+    // المسجل دخوله: الجلسة هي الهوية — لا نرسل الهاتف
+    const loggedIn = !!(global.Basit.Auth && global.Basit.Auth.isLoggedIn());
+    const phone = (withPhone === false || loggedIn) ? "" : getPhone();
     if (phone) q.set("customerPhone", phone);
     if (cartIds && cartIds.length) q.set("cartProductIds", cartIds.slice(0, 30).join(","));
     if (category) q.set("category", category);
@@ -59,7 +61,11 @@
 
   /** تحميل "اشتريته قبل كده" قبل أول رسم — يُستدعى من boot */
   async function preload() {
-    if (!getPhone()) return;
+    try {
+      if (global.Basit.Auth) await global.Basit.Auth.ensure();
+    } catch (e) { /* ضيف */ }
+    const loggedIn = !!(global.Basit.Auth && global.Basit.Auth.isLoggedIn());
+    if (!getPhone() && !loggedIn) return;
     try {
       const d = await fetchRecs({ limit: 4 });
       if (d) {
@@ -83,7 +89,8 @@
       ]);
       if (a && a.recommendations) out.popular = a.recommendations.slice(0, 4);
       if (b && b.recommendations) out.fresh = b.recommendations.filter((p) => p.isNew).slice(0, 4);
-      if (getPhone()) {
+      const loggedIn = !!(global.Basit.Auth && global.Basit.Auth.isLoggedIn());
+      if (getPhone() || loggedIn) {
         const c = await fetchRecs({ limit: 4 });
         if (c && c.customerType === "returning" && c.recommendations.length) {
           out.personal = c.recommendations.slice(0, 4);
@@ -124,9 +131,17 @@
     return list;
   }
 
+  /** ترشيحات شخصية عامة (صفحة الحساب) — بالجلسة للمسجل، وبالهاتف للضيف */
+  async function personal(limit) {
+    try {
+      const d = await fetchRecs({ limit: limit || 4 });
+      return d && d.recommendations ? d.recommendations : [];
+    } catch (e) { return []; }
+  }
+
   global.Basit = global.Basit || {};
   global.Basit.Recs = {
     getPhone, getRemembered, remember, preload,
-    isBought, timesBought, getHomeSections, forCart, forProduct,
+    isBought, timesBought, getHomeSections, forCart, forProduct, personal,
   };
 })(window);

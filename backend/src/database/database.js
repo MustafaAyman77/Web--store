@@ -97,6 +97,22 @@ function migrate(database) {
   database.exec("CREATE INDEX IF NOT EXISTS idx_customers_status ON customers(status);");
   database.exec("CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id, status);");
   database.exec("CREATE INDEX IF NOT EXISTS idx_items_product ON order_items(product_id);");
+  // --- المرحلة 9: حسابات العملاء + OTP + الجلسات ---
+  if (!customerCols.includes("account_enabled")) database.exec("ALTER TABLE customers ADD COLUMN account_enabled INTEGER NOT NULL DEFAULT 0;");
+  if (!customerCols.includes("phone_verified")) database.exec("ALTER TABLE customers ADD COLUMN phone_verified INTEGER NOT NULL DEFAULT 0;");
+  if (!customerCols.includes("last_login_at")) database.exec("ALTER TABLE customers ADD COLUMN last_login_at TEXT;");
+  database.exec(`CREATE TABLE IF NOT EXISTS otp_codes (
+    id TEXT PRIMARY KEY, customer_id TEXT REFERENCES customers(id), phone TEXT NOT NULL,
+    code_hash TEXT NOT NULL, expires_at TEXT NOT NULL,
+    attempts INTEGER NOT NULL DEFAULT 0, verified_at TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')));`);
+  database.exec("CREATE INDEX IF NOT EXISTS idx_otp_phone ON otp_codes(phone, created_at);");
+  database.exec(`CREATE TABLE IF NOT EXISTS customer_sessions (
+    id TEXT PRIMARY KEY, customer_id TEXT NOT NULL REFERENCES customers(id),
+    token_hash TEXT NOT NULL UNIQUE, expires_at TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')));`);
+  database.exec("CREATE INDEX IF NOT EXISTS idx_sessions_token ON customer_sessions(token_hash);");
+  database.exec("CREATE INDEX IF NOT EXISTS idx_sessions_customer ON customer_sessions(customer_id);");
   const adminCols = database.prepare("PRAGMA table_info(admins);").all().map((c) => c.name);
   if (!adminCols.includes("role")) {
     database.exec("ALTER TABLE admins ADD COLUMN role TEXT NOT NULL DEFAULT 'owner';");

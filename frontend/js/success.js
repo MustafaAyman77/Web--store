@@ -50,11 +50,35 @@
           '<div class="summary-total"><span>الإجمالي</span><output>' + UI.fmtPrice(total) + "</output></div>" +
         "</div>" +
         '<p class="success-note">' + demoNote + "</p>" +
+        '<div id="accInvite"></div>' +
         '<div class="success-actions">' +
           '<a class="btn btn-primary" href="products.html">🛒 العودة للتسوق</a>' +
           '<a class="btn btn-outline" href="index.html">🏠 الرئيسية</a>' +
         "</div>" +
       "</div>";
+    offerAccount(order);
+  }
+
+  /** دعوة اختيارية لإنشاء حساب بعد الطلب — للضيوف فقط، وليست شرطًا أبدًا */
+  function offerAccount(order) {
+    const box = document.getElementById("accInvite");
+    if (!box) return;
+    const Auth = global.Basit.Auth;
+    if (!Auth) return;
+    Auth.ensure().then((me) => {
+      if (me) return; // مسجل بالفعل
+      const phone = order && order.customer ? order.customer.phone : "";
+      const name = order && order.customer ? order.customer.name : "";
+      box.innerHTML =
+        '<div class="acc-invite">' +
+          "<p>💾 عايز تحفظ بياناتك وتتابع طلباتك بسهولة؟ اعمل حساب برقمك في ثواني.</p>" +
+          '<div class="acc-invite-row">' +
+            '<a class="btn btn-primary" href="login.html?phone=' + encodeURIComponent(phone || "") + "&name=" + encodeURIComponent(name || "") + '&next=account.html">إنشاء حساب ✨</a>' +
+            '<button type="button" class="btn btn-outline" id="accInviteLater">ليس الآن</button>' +
+          "</div>" +
+        "</div>";
+      document.getElementById("accInviteLater").addEventListener("click", () => { box.innerHTML = ""; });
+    }).catch(() => {});
   }
 
   global.Basit = global.Basit || {};

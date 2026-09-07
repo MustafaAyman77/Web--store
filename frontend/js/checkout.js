@@ -370,7 +370,7 @@
     Orders = global.Basit.Orders;
     if (!onPage() || !Cart || !UI || !Orders) return;
     bind();
-    prefillRemembered();
+    prefillCustomer();
     applyFulfillment();
     renderSummary();
     renderReview();
@@ -379,16 +379,30 @@
   }
 
   /** تعبئة الاسم والهاتف من زيارة سابقة (على جهاز العميل فقط) */
-  function prefillRemembered() {
+  /** تعبئة بيانات العميل: الحساب المسجل أولًا، ثم الرقم المتذكَّر — قابلة للتعديل */
+  async function prefillCustomer() {
+    const fill = (id, val) => {
+      const el = document.getElementById(id);
+      if (el && !el.value && val) el.value = val;
+    };
+    try {
+      const Auth = global.Basit.Auth;
+      const me = Auth ? await Auth.ensure() : null;
+      if (me) {
+        fill("coName", me.name);
+        fill("coPhone", me.phone);
+        fill("coAddress", me.address);
+        fill("coArea", me.area);
+        fill("coLandmark", me.landmark);
+        return;
+      }
+    } catch (e) { /* تجاهل */ }
     try {
       const Recs = global.Basit.Recs;
-      if (!Recs) return;
-      const r = Recs.getRemembered();
+      const r = Recs ? Recs.getRemembered() : null;
       if (!r) return;
-      const nameEl = document.getElementById("coName");
-      const phoneEl = document.getElementById("coPhone");
-      if (nameEl && !nameEl.value && r.name) nameEl.value = r.name;
-      if (phoneEl && !phoneEl.value && r.phone) phoneEl.value = r.phone;
+      fill("coName", r.name);
+      fill("coPhone", r.phone);
     } catch (e) { /* تجاهل */ }
   }
 

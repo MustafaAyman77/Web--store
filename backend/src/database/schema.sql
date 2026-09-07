@@ -37,10 +37,37 @@ CREATE TABLE IF NOT EXISTS customers (
   landmark   TEXT DEFAULT '',
   notes      TEXT DEFAULT '',                -- ملاحظات داخلية للإدارة فقط
   status     TEXT NOT NULL DEFAULT 'active', -- active | inactive | blocked
+  account_enabled INTEGER NOT NULL DEFAULT 0, -- 1 = لديه حساب (اختياري)
+  phone_verified  INTEGER NOT NULL DEFAULT 0, -- 1 = تحقق من هاتفه عبر OTP
+  last_login_at   TEXT,                      -- آخر دخول ناجح
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
+
+-- رموز التحقق المؤقتة (المرحلة 9) — يُخزَّن الـHash فقط، never النص الصريح
+CREATE TABLE IF NOT EXISTS otp_codes (
+  id          TEXT PRIMARY KEY,
+  customer_id TEXT REFERENCES customers(id),
+  phone       TEXT NOT NULL,
+  code_hash   TEXT NOT NULL,
+  expires_at  TEXT NOT NULL,
+  attempts    INTEGER NOT NULL DEFAULT 0,
+  verified_at TEXT,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_otp_phone ON otp_codes(phone, created_at);
+
+-- جلسات العملاء (المرحلة 9) — يُخزَّن Hash التوكن فقط
+CREATE TABLE IF NOT EXISTS customer_sessions (
+  id          TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL REFERENCES customers(id),
+  token_hash  TEXT NOT NULL UNIQUE,
+  expires_at  TEXT NOT NULL,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_token ON customer_sessions(token_hash);
+CREATE INDEX IF NOT EXISTS idx_sessions_customer ON customer_sessions(customer_id);
 
 CREATE TABLE IF NOT EXISTS orders (
   id               TEXT PRIMARY KEY,         -- UUID داخلي

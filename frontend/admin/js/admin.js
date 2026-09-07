@@ -999,7 +999,8 @@
         ? data.customers.map((c) =>
           '<a class="ad-card ad-row-card" data-link href="/admin/customers/' + esc(c.id) + '">' +
           '<div class="ad-row-top"><strong>👤 ' + esc(c.name) + "</strong><span>🧾 " + c.ordersCount + " طلب" +
-          (c.status === "blocked" ? ' <span class="st st-ontg-failed">⛔ موقوف</span>' : c.status === "inactive" ? ' <span class="st st-cancelled">⚪ غير نشط</span>' : "") + "</span></div>" +
+          (c.status === "blocked" ? ' <span class="st st-ontg-failed">⛔ موقوف</span>' : c.status === "inactive" ? ' <span class="st st-cancelled">⚪ غير نشط</span>' : "") +
+          (c.accountStatus === "registered" ? ' <span class="st st-ontg-sent">🔑 حساب</span>' : "") + "</span></div>" +
           '<div class="ad-row-meta"><span>📞 <b dir="ltr">' + esc(c.phone) + "</b></span><span>💰 إجمالي: <b>" + fmtPrice(c.totalSpent) + "</b></span>" +
           "<span>🕐 آخر طلب: " + (c.lastOrderAt ? esc(fmtDT(c.lastOrderAt)) : "—") + "</span></div>" +
           "</a>").join("")
@@ -1032,6 +1033,15 @@
         '<div class="ad-kv"><span class="k">عدد الطلبات</span><span class="v">' + c.ordersCount + "</span></div>" +
         '<div class="ad-kv"><span class="k">إجمالي المشتريات</span><span class="v">' + fmtPrice(c.totalSpent) + "</span></div>" +
         "</section>" +
+        '<section class="ad-card"><h2>🔑 الحساب</h2>' +
+        '<div class="ad-kv"><span class="k">الحالة</span><span class="v">' +
+        (c.accountStatus === "blocked" ? "⛔ موقوف" : c.accountStatus === "registered" ? "✅ مسجل" : "👤 ضيف (بدون حساب)") + "</span></div>" +
+        '<div class="ad-kv"><span class="k">الهاتف مؤكد</span><span class="v">' + (c.phoneVerified ? "✅" : "—") + "</span></div>" +
+        '<div class="ad-kv"><span class="k">آخر دخول</span><span class="v">' + (c.lastLoginAt ? esc(fmtDT(c.lastLoginAt)) : "—") + "</span></div>" +
+        (c.accountEnabled
+          ? '<button type="button" class="ad-btn ad-btn-outline ad-btn-sm" id="csDisable" style="margin-top:.5rem">🔓 تعطيل الحساب</button>'
+          : '<button type="button" class="ad-btn ad-btn-primary ad-btn-sm" id="csDisable" style="margin-top:.5rem">🔑 تفعيل الحساب</button>') +
+        "</section>" +
         '<section class="ad-card"><h2>⚙️ الحالة والملاحظات</h2>' +
         '<div class="ad-field"><label for="csStatus">الحالة</label><select id="csStatus">' +
         [["active", "🟢 نشط"], ["inactive", "⚪ غير نشط"], ["blocked", "⛔ موقوف"]].map(([v, l]) => '<option value="' + v + '"' + (c.status === v ? " selected" : "") + ">" + l + "</option>").join("") +
@@ -1059,6 +1069,22 @@
             "</a>").join("")
           : stateHTML("🧾", "لا توجد طلبات", "لم يقم هذا العميل بأي طلب بعد.")) +
         "</div>";
+
+      document.getElementById("csDisable").addEventListener("click", async () => {
+        const enable = !c.accountEnabled;
+        const ok = await confirmDlg(
+          enable ? "تفعيل الحساب؟" : "تعطيل الحساب؟",
+          enable ? "سيتمكن " + c.name + " من تسجيل الدخول ومتابعة طلباته." : "لن يتمكن " + c.name + " من الدخول (تُبطل جلساته فورًا) — طلباته القديمة محفوظة.",
+          enable ? "تفعيل" : "تعطيل",
+          !enable
+        );
+        if (!ok) return;
+        try {
+          await api("/admin/customers/" + encodeURIComponent(id), { method: "PATCH", body: { account_enabled: enable } });
+          toast(enable ? "✅ تم تفعيل الحساب" : "✅ تم تعطيل الحساب");
+          pageCustomerDetails(id);
+        } catch (ex) { toast(ex.message || "تعذر الحفظ", true); }
+      });
 
       document.getElementById("csSave").addEventListener("click", async (e) => {
         const btn = e.currentTarget;

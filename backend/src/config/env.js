@@ -50,6 +50,18 @@ export const env = {
     newProductDays: Math.max(1, toInt(process.env.NEW_PRODUCT_DAYS, 14)),
     minCoOccurrences: Math.max(1, toInt(process.env.RECOMMENDATION_MIN_CO_OCCURRENCES, 3)),
   },
+
+  // --- حسابات العملاء + OTP (المرحلة 9) ---
+  auth: {
+    enabled: toBool(process.env.CUSTOMER_AUTH_ENABLED, true),
+    // ⚠️ سر — من .env فقط، ولا يدخل Git أبدًا
+    sessionSecret: process.env.SESSION_SECRET || "",
+    sessionTtlHours: Math.max(1, toInt(process.env.SESSION_TTL_HOURS, 720)), // 30 يومًا
+    otpProvider: (process.env.OTP_PROVIDER || "demo").toLowerCase(),
+    otpExpirationMinutes: Math.max(1, toInt(process.env.OTP_EXPIRATION_MINUTES, 5)),
+    otpMaxAttempts: Math.max(1, toInt(process.env.OTP_MAX_ATTEMPTS, 5)),
+    otpResendCooldownSeconds: Math.max(10, toInt(process.env.OTP_RESEND_COOLDOWN_SECONDS, 60)),
+  },
 };
 
 export default env;

@@ -15,6 +15,9 @@ const server = app.listen(env.port, () => {
   console.log(`   → الموقع:  http://localhost:${env.port}`);
   console.log(`   → الصحة:   http://localhost:${env.port}/api/health`);
   console.log(`   → البيئة:  ${env.nodeEnv} | التوصيل: ${env.delivery.enabled ? "مفعّل" : "معطّل"} | Telegram: ${env.telegram.enabled ? "مفعّل" : "معطّل"}`);
+  if (env.isDev && env.auth.enabled && env.auth.otpProvider === "demo") {
+    console.log(`   ⚠️  Demo Authentication مفعّلة (OTP تجريبي في logs التطوير فقط) — ليست مصادقة Production.`);
+  }
 });
 
 function shutdown(signal) {

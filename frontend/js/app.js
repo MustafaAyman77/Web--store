@@ -25,6 +25,8 @@
         if (global.Basit.Shop) global.Basit.Shop.init();
         if (global.Basit.Checkout) global.Basit.Checkout.init();
         if (global.Basit.Success) global.Basit.Success.init();
+        if (global.Basit.Login) global.Basit.Login.init();
+        if (global.Basit.Account) global.Basit.Account.init();
       } catch (err) {
         // لا نكسر الصفحة أبدًا — نسجل الخطأ فقط
         if (global.console && console.error) console.error("[Basit] init failed:", err);

@@ -75,22 +75,31 @@ const pairKey = (x, y) => (x < y ? `${x}|${y}` : `${y}|${x}`);
 
 /**
  * التوصيات الرئيسية.
+ * @param {string} customerId اختياري — من جلسة الدخول (أولوية على الهاتف)
  * @param {string} customerPhone اختياري — للتخصيص فقط، ولا يُعاد أي بيانات عنه
  * @param {string[]} cartIds منتجات السلة الحالية (تُستبعد من النتائج)
  * @param {string} category اختياري — حصر في قسم (صفحة المنتج)
  * @param {number} limit 1..12 (افتراضي 4)
  */
-export function getRecommendations({ customerPhone, cartIds, category, limit } = {}) {
+export function getRecommendations({ customerId, customerPhone, cartIds, category, limit } = {}) {
   const db = getDb();
   const lim = Math.min(12, Math.max(1, Number(limit) || 4));
   const cart = Array.isArray(cartIds) ? [...new Set(cartIds.map((v) => String(v)).filter(Boolean))].slice(0, 30) : [];
   const cartSet = new Set(cart);
 
   // العميل وتاريخه (داخلي فقط — لا يخرج في الاستجابة)
+  // الجلسة الموثقة أولًا — ولا يُعتمد على هاتف الـFrontend مع وجودها
   let history = null;
-  if (customerPhone) {
+  let identified = false;
+  if (customerId) {
+    identified = true;
+    history = getPurchaseHistory(String(customerId));
+  } else if (customerPhone) {
     const customer = findCustomerByPhone(customerPhone);
-    if (customer) history = getPurchaseHistory(customer.id);
+    if (customer) {
+      identified = true;
+      history = getPurchaseHistory(customer.id);
+    }
   }
   const bought = {};
   (history?.products || []).forEach((p) => { bought[p.productId] = Number(p.times) || 0; });
@@ -167,7 +176,7 @@ export function getRecommendations({ customerPhone, cartIds, category, limit } =
       boughtBefore: times > 0,
       timesBought: times,
     })),
-    customerType: history && history.products.length ? "returning" : customerPhone ? "new" : "anonymous",
+    customerType: history && history.products.length ? "returning" : identified ? "new" : "anonymous",
     // لشارات "اشتريته قبل كده" و"بتشتريه كتير" — IDs وأعداد فقط
     boughtBefore: Object.keys(bought).slice(0, 100),
     purchaseCounts: Object.fromEntries(Object.entries(bought).slice(0, 50)),
