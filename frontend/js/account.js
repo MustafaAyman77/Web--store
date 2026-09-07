@@ -198,7 +198,9 @@
           "<h1>طلب #" + esc(o.orderNumber) + "</h1>" +
           '<div id="accOrderStatus">' + statusChip(o.status) + "</div>" +
           '<p class="acc-muted">' + esc(fmtDate(o.createdAt)) + " • " +
-          (o.fulfillmentMethod === "pickup" ? "🏪 استلام من المحل" : "🚚 توصيل للمنزل") + "</p>" +
+          (o.fulfillmentMethod === "pickup" ? "🏪 استلام من المحل" : "🚚 توصيل للمنزل") +
+          (o.deliveryZoneName ? " • 🗺️ " + esc(o.deliveryZoneName) : "") + "</p>" +
+          prepLine() +
           '<p class="acc-muted">🕘 آخر تحديث: ' + esc(ago(o.updatedAt || o.createdAt)) + "</p>" +
           '<div id="accOrderTimeline">' + timeline(o) + "</div>" +
           historyHTML(o.statusHistory) +
@@ -230,6 +232,14 @@
     // تحديث تلقائي كل 45 ثانية داخل صفحة الطلب فقط
     stopPolling();
     pollTimer = setInterval(paint, 45000);
+  }
+
+  function prepLine() {
+    try {
+      const mins = global.Basit.Store ? global.Basit.Store.get().estimatedPreparationMinutes : 0;
+      if (mins > 0) return '<p class="acc-muted">⏱️ الوقت المتوقع للتجهيز: ' + mins + " دقيقة</p>";
+    } catch (e) { /* تجاهل */ }
+    return "";
   }
 
   function historyHTML(hist) {

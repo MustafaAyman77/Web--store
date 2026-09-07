@@ -39,12 +39,22 @@
       const api = global.Basit.Api;
       const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 2500));
       const recsPreload = global.Basit.Recs ? global.Basit.Recs.preload().catch(() => {}) : Promise.resolve();
+      const storePreload = global.Basit.Store ? global.Basit.Store.ensure().catch(() => {}) : Promise.resolve();
       Promise.race([api.getProducts(), timeout])
         .then((data) => {
           if (data && data.products && data.products.length) global.BasitData._replaceAll(data);
         })
         .catch(() => { /* الوضع المحلي — تجاهل */ })
-        .finally(() => { Promise.race([recsPreload, timeout]).catch(() => {}).finally(boot); });
+        .finally(() => {
+          Promise.all([Promise.race([recsPreload, timeout]).catch(() => {}), Promise.race([storePreload, timeout]).catch(() => {})])
+            .finally(() => {
+              // بوابة الصيانة قبل أي رسم — لوحة /admin تطبيق منفصل لا يتأثر
+              try {
+                if (global.Basit.Store && global.Basit.Store.maintenanceGate()) { booted = true; return; }
+              } catch (e) { /* تجاهل */ }
+              boot();
+            });
+        });
       setTimeout(boot, 3000); // أمان: إقلاع إجباري
     } catch (err) {
       boot();

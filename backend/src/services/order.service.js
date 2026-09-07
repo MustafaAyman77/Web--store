@@ -13,6 +13,7 @@ import { ApiError } from "../utils/api-error.js";
 import { sendOrderNotification } from "./telegram.service.js";
 import { deductForOrder, restoreForOrder } from "./inventory.service.js";
 import { assertCustomerCanOrder } from "./customer.service.js";
+import { getSettings } from "./settings.service.js";
 import { recordStatusChange } from "./status-history.service.js";
 import { createStatusNotification } from "./notification.service.js";
 
@@ -54,9 +55,7 @@ function validatePayload(body) {
   }
 
   const fulfillmentMethod = body?.fulfillmentMethod === "pickup" ? "pickup" : "delivery";
-  if (fulfillmentMethod === "delivery" && !env.delivery.enabled) {
-    throw ApiError.badRequest("DELIVERY_DISABLED", "خدمة التوصيل غير متاحة حاليًا — اختر الاستلام من المحل.");
-  }
+  // بوابات المتجر/المنطقة تُفحص في resolveFulfillment (من الـDB — وليس الثقة بالمدخلات)
 
   const address = cleanStr(customer.address, 300);
   if (fulfillmentMethod === "delivery" && address.length < 5) {
@@ -89,8 +88,103 @@ function validatePayload(body) {
       landmark: fulfillmentMethod === "delivery" ? cleanStr(customer.landmark, 200) : "",
     },
     fulfillmentMethod,
+    deliveryZoneId: String(body?.deliveryZoneId || "").trim().slice(0, 60),
     notes: cleanStr(body?.notes, 500),
     items: normalized,
+  };
+}
+
+/* ================= تسعير الأصناف من الـDB (مشترك: إنشاء + عرض سعر) ================= */
+
+function priceLines(db, items) {
+  const getProduct = db.prepare("SELECT * FROM products WHERE id = ?;");
+  const lines = items.map(({ productId, quantity }) => {
+    const p = getProduct.get(productId);
+    if (!p) throw ApiError.notFound("PRODUCT_NOT_FOUND", `المنتج غير موجود (${productId}).`);
+    if (Number(p.available) !== 1) {
+      throw ApiError.badRequest("PRODUCT_UNAVAILABLE", `"${p.name}" غير متوفر حاليًا.`);
+    }
+    const tracked = Number(p.stock_tracking) === 1;
+    if (tracked && Number(p.stock_quantity) < quantity) {
+      throw ApiError.badRequest("INSUFFICIENT_STOCK", "الكمية المطلوبة من هذا المنتج غير متاحة حاليًا");
+    }
+    const price = Number(p.price);
+    if (!Number.isFinite(price) || price < 0) {
+      throw ApiError.badRequest("INVALID_PRICE", "سعر المنتج غير صالح.");
+    }
+    return { productId: p.id, productName: p.name, quantity, price, subtotal: price * quantity, tracked };
+  });
+  return { lines, subtotal: lines.reduce((s, l) => s + l.subtotal, 0) };
+}
+
+/* ================= بوابات المتجر + حساب التوصيل (Backend فقط) ================= */
+
+function resolveFulfillment(db, { fulfillmentMethod, deliveryZoneId, subtotal }) {
+  const st = getSettings();
+  if (st.maintenanceMode) {
+    throw ApiError.forbidden("MAINTENANCE_MODE", "المتجر تحت الصيانة حاليًا — نعود للعمل قريبًا.");
+  }
+  if (!st.ordersEnabled) {
+    throw ApiError.forbidden("ORDERS_DISABLED", "المتجر لا يستقبل الطلبات حاليًا.");
+  }
+  if (fulfillmentMethod === "pickup") {
+    if (!st.pickupEnabled) {
+      throw ApiError.badRequest("PICKUP_DISABLED", "الاستلام من المحل غير متاح حاليًا.");
+    }
+    return { deliveryFee: null, zoneId: null, zoneName: "" };
+  }
+  // توصيل
+  if (!st.deliveryEnabled) {
+    if (!st.pickupEnabled) {
+      throw ApiError.badRequest("NO_FULFILLMENT", "المتجر لا يوفر طرق استلام متاحة حاليًا.");
+    }
+    throw ApiError.badRequest("DELIVERY_DISABLED", "خدمة التوصيل غير متاحة حاليًا — اختر الاستلام من المحل.");
+  }
+  if (!deliveryZoneId) {
+    throw ApiError.badRequest("ZONE_REQUIRED", "من فضلك اختر منطقة التوصيل.");
+  }
+  const zone = db.prepare("SELECT * FROM delivery_zones WHERE id = ?;").get(deliveryZoneId);
+  if (!zone || Number(zone.enabled) !== 1) {
+    throw ApiError.badRequest("ZONE_INVALID", "منطقة التوصيل غير متاحة حاليًا.");
+  }
+  const zoneMin = Number(zone.minimum_order_amount) || 0;
+  const effectiveMin = zoneMin > 0 ? zoneMin : st.minimumOrderAmount;
+  if (effectiveMin > 0 && subtotal < effectiveMin) {
+    throw ApiError.badRequest("MINIMUM_ORDER", `الحد الأدنى لطلب التوصيل في هذه المنطقة هو ${effectiveMin} جنيه.`);
+  }
+  let fee = Number(zone.delivery_fee) || 0;
+  if (fee <= 0 && st.defaultDeliveryFee > 0) fee = st.defaultDeliveryFee;
+  if (st.freeDeliveryThreshold > 0 && subtotal >= st.freeDeliveryThreshold) fee = 0;
+  return { deliveryFee: Math.round(fee * 100) / 100, zoneId: zone.id, zoneName: zone.name };
+}
+
+/** عرض سعر للـCheckout — نفس حساب الإنشاء تمامًا، بدون حفظ */
+export function quoteTotals(body) {
+  const items = body?.items;
+  if (!Array.isArray(items) || items.length === 0 || items.length > 50) {
+    throw ApiError.badRequest("EMPTY_ITEMS", "الطلب لا يحتوي على منتجات.");
+  }
+  const normalized = items.map((it) => {
+    const productId = String(it?.productId ?? it?.id ?? "").trim();
+    const quantity = Number(it?.quantity);
+    if (!productId) throw ApiError.badRequest("INVALID_ITEM", "بيانات صنف غير صحيحة.");
+    if (!Number.isInteger(quantity) || quantity < 1 || quantity > MAX_QTY) {
+      throw ApiError.badRequest("INVALID_QUANTITY", "الكمية يجب أن تكون رقمًا صحيحًا بين 1 و 20.");
+    }
+    return { productId, quantity };
+  });
+  const db = getDb();
+  const { subtotal } = priceLines(db, normalized);
+  const fulfillmentMethod = body?.fulfillmentMethod === "pickup" ? "pickup" : "delivery";
+  const ff = resolveFulfillment(db, {
+    fulfillmentMethod,
+    deliveryZoneId: String(body?.deliveryZoneId || "").trim().slice(0, 60),
+    subtotal,
+  });
+  return {
+    fulfillmentMethod,
+    subtotal, deliveryFee: ff.deliveryFee, total: subtotal + (ff.deliveryFee || 0),
+    deliveryZoneId: ff.zoneId, deliveryZoneName: ff.zoneName,
   };
 }
 
@@ -101,27 +195,15 @@ export async function createOrder(body) {
 
   const result = transaction((db) => {
     // 1) التحقق من الأصناف + حساب الأسعار من الـDB
-    const getProduct = db.prepare("SELECT * FROM products WHERE id = ?;");
-    const lines = input.items.map(({ productId, quantity }) => {
-      const p = getProduct.get(productId);
-      if (!p) throw ApiError.notFound("PRODUCT_NOT_FOUND", `المنتج غير موجود (${productId}).`);
-      if (Number(p.available) !== 1) {
-        throw ApiError.badRequest("PRODUCT_UNAVAILABLE", `"${p.name}" غير متوفر حاليًا.`);
-      }
-      const tracked = Number(p.stock_tracking) === 1;
-      if (tracked && Number(p.stock_quantity) < quantity) {
-        throw ApiError.badRequest("INSUFFICIENT_STOCK", "الكمية المطلوبة من هذا المنتج غير متاحة حاليًا");
-      }
-      const price = Number(p.price);
-      if (!Number.isFinite(price) || price < 0) {
-        throw ApiError.badRequest("INVALID_PRICE", "سعر المنتج غير صالح.");
-      }
-      return { productId: p.id, productName: p.name, quantity, price, subtotal: price * quantity, tracked };
-    });
-
-    const subtotal = lines.reduce((s, l) => s + l.subtotal, 0);
+    const { lines, subtotal } = priceLines(db, input.items);
     const trackedLines = lines.filter((l) => l.tracked);
-    const deliveryFee = input.fulfillmentMethod === "delivery" ? env.delivery.fee : null;
+    // 1ب) بوابات المتجر + رسوم التوصيل من الـDB (لا ثقة بأي قيمة من المتصفح)
+    const ff = resolveFulfillment(db, {
+      fulfillmentMethod: input.fulfillmentMethod,
+      deliveryZoneId: input.deliveryZoneId,
+      subtotal,
+    });
+    const deliveryFee = ff.deliveryFee;
     const total = subtotal + (deliveryFee || 0);
 
     // 2) العميل: موجود بنفس الهاتف → استخدام + تحديث بياناته، وإلا → جديد
@@ -150,9 +232,9 @@ export async function createOrder(body) {
     const orderNumber = generateOrderNumber(db);
     db.prepare(
       `INSERT INTO orders
-       (id, order_number, customer_id, subtotal, delivery_fee, total, fulfillment_method, notes, status, telegram_status, stock_deducted)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?);`
-    ).run(orderId, orderNumber, customer.id, subtotal, deliveryFee, total, input.fulfillmentMethod, input.notes, env.telegram.enabled ? "pending" : "disabled", trackedLines.length ? 1 : 0);
+       (id, order_number, customer_id, subtotal, delivery_fee, total, fulfillment_method, delivery_zone_id, delivery_zone_name, notes, status, telegram_status, stock_deducted)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?);`
+    ).run(orderId, orderNumber, customer.id, subtotal, deliveryFee, total, input.fulfillmentMethod, ff.zoneId, ff.zoneName, input.notes, env.telegram.enabled ? "pending" : "disabled", trackedLines.length ? 1 : 0);
 
     const insertItem = db.prepare(
       "INSERT INTO order_items (id, order_id, product_id, product_name, quantity, price, subtotal) VALUES (?, ?, ?, ?, ?, ?, ?);"
@@ -176,6 +258,9 @@ export async function createOrder(body) {
       subtotal,
       deliveryFee,
       total,
+      fulfillmentMethod: input.fulfillmentMethod,
+      deliveryZoneId: ff.zoneId,
+      deliveryZoneName: ff.zoneName,
       itemCount: lines.reduce((s, l) => s + l.quantity, 0),
     };
   });
@@ -210,6 +295,8 @@ export function getOrderByIdOrNumber(ref) {
     deliveryFee: order.delivery_fee,
     total: order.total,
     fulfillmentMethod: order.fulfillment_method,
+    deliveryZoneId: order.delivery_zone_id || null,
+    deliveryZoneName: order.delivery_zone_name || "",
     notes: order.notes,
     createdAt: order.created_at,
     customer,
@@ -310,6 +397,8 @@ export function trackOrder({ orderNumber, phone }) {
     deliveryFee: order.delivery_fee,
     total: order.total,
     fulfillmentMethod: order.fulfillment_method,
+    deliveryZoneId: order.delivery_zone_id || null,
+    deliveryZoneName: order.delivery_zone_name || "",
     createdAt: order.created_at,
     updatedAt: order.updated_at,
     items,

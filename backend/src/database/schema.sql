@@ -94,6 +94,45 @@ CREATE TABLE IF NOT EXISTS notifications (
 CREATE INDEX IF NOT EXISTS idx_notif_customer ON notifications(customer_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_notif_unread ON notifications(customer_id, is_read);
 
+-- إعدادات المتجر المركزية (المرحلة 11) — صف واحد (id = 1)
+CREATE TABLE IF NOT EXISTS store_settings (
+  id               INTEGER PRIMARY KEY CHECK (id = 1),
+  store_name       TEXT NOT NULL DEFAULT 'أسواق البسيط',
+  store_address    TEXT NOT NULL DEFAULT '',
+  store_phone      TEXT NOT NULL DEFAULT '',
+  store_whatsapp   TEXT NOT NULL DEFAULT '',
+  store_description TEXT NOT NULL DEFAULT '',
+  store_logo       TEXT NOT NULL DEFAULT '',
+  store_latitude   REAL,
+  store_longitude  REAL,
+  store_open_24_7  INTEGER NOT NULL DEFAULT 1,
+  orders_enabled   INTEGER NOT NULL DEFAULT 1,
+  delivery_enabled INTEGER NOT NULL DEFAULT 1,
+  pickup_enabled   INTEGER NOT NULL DEFAULT 1,
+  minimum_order_amount REAL NOT NULL DEFAULT 0,
+  free_delivery_threshold REAL NOT NULL DEFAULT 0,
+  default_delivery_fee REAL NOT NULL DEFAULT 0,
+  estimated_preparation_minutes INTEGER NOT NULL DEFAULT 0,
+  customer_order_note TEXT NOT NULL DEFAULT '',
+  maintenance_mode INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- مناطق التوصيل (المرحلة 11)
+CREATE TABLE IF NOT EXISTS delivery_zones (
+  id            TEXT PRIMARY KEY,
+  name          TEXT NOT NULL,
+  description   TEXT NOT NULL DEFAULT '',
+  delivery_fee  REAL NOT NULL DEFAULT 0,
+  minimum_order_amount REAL NOT NULL DEFAULT 0,
+  estimated_minutes INTEGER NOT NULL DEFAULT 0,
+  enabled       INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_zones_enabled ON delivery_zones(enabled);
+
 CREATE TABLE IF NOT EXISTS orders (
   id               TEXT PRIMARY KEY,         -- UUID داخلي
   order_number     TEXT NOT NULL UNIQUE,     -- BS-YYYYMMDD-NNNN للعميل

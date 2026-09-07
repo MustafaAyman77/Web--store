@@ -76,6 +76,8 @@ export function getMyOrderDetails(customerId, orderNumber) {
     deliveryFee: order.delivery_fee,
     total: order.total,
     fulfillmentMethod: order.fulfillment_method,
+    deliveryZoneId: order.delivery_zone_id || null,
+    deliveryZoneName: order.delivery_zone_name || "",
     notes: order.notes || "",
     createdAt: order.created_at,
     updatedAt: order.updated_at,

@@ -6,7 +6,8 @@ import {
   productsList, productCreate, productUpdate, productDelete, productsBulk, customersList, customerDetails,
   categoriesList, categoryCreate, categoryUpdate,
   inventorySummary, inventoryProduct, inventoryAdjust, inventoryHistory,
-  customerUpdate,
+  customerUpdate, storeSettings, storeSettingsUpdate,
+  zonesList, zoneCreate, zoneUpdate, zoneDelete,
 } from "../controllers/admin.controller.js";
 
 const router = Router();
@@ -34,5 +35,11 @@ router.post("/telegram/test", requireAdmin, asyncHandler(telegramTest));
 router.post("/orders/:ref/telegram/retry", requireAdmin, asyncHandler(telegramRetry));
 router.get("/orders", requireAdmin, asyncHandler(orders));
 router.patch("/orders/:ref/status", requireAdmin, asyncHandler(setOrderStatus));
+router.get("/settings/store", requireAdmin, asyncHandler(storeSettings));
+router.patch("/settings/store", requireAdmin, asyncHandler(storeSettingsUpdate));
+router.get("/delivery-zones", requireAdmin, asyncHandler(zonesList));
+router.post("/delivery-zones", requireAdmin, asyncHandler(zoneCreate));
+router.patch("/delivery-zones/:id", requireAdmin, asyncHandler(zoneUpdate));
+router.delete("/delivery-zones/:id", requireAdmin, asyncHandler(zoneDelete));
 
 export default router;

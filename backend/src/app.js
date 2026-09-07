@@ -10,6 +10,17 @@ import { fileURLToPath } from "node:url";
 import { env } from "./config/env.js";
 import { notFound, errorHandler } from "./middleware/error.middleware.js";
 import { securityHeaders } from "./middleware/security.middleware.js";
+import { getPublicStore } from "./services/settings.service.js";
+
+// أعلام المتجر من الـDB (مع fallback آمن لـ .env عند غياب الجدول)
+function storeFlags() {
+  try {
+    const s = getPublicStore();
+    return { deliveryEnabled: s.deliveryEnabled };
+  } catch {
+    return { deliveryEnabled: env.delivery.enabled };
+  }
+}
 import { attachCustomer } from "./middleware/customer-auth.middleware.js";
 import productsRoutes from "./routes/products.routes.js";
 import ordersRoutes from "./routes/orders.routes.js";
@@ -19,6 +30,7 @@ import recommendationsRoutes from "./routes/recommendations.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import meRoutes from "./routes/me.routes.js";
 import notificationsRoutes from "./routes/notifications.routes.js";
+import storeRoutes from "./routes/store.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -51,7 +63,7 @@ export function createApp() {
     res.json({
       success: true,
       data: {
-        deliveryEnabled: env.delivery.enabled,
+        deliveryEnabled: storeFlags().deliveryEnabled,
         trackingEnabled: env.tracking.enabled,
         notificationsEnabled: env.notifications.enabled,
         statusPollSeconds: env.statusPollSeconds,
@@ -68,6 +80,7 @@ export function createApp() {
   app.use("/api/auth", authRoutes);
   app.use("/api/me", attachCustomer, meRoutes);
   app.use("/api/notifications", attachCustomer, notificationsRoutes);
+  app.use("/api", storeRoutes);
   app.use("/api/admin", adminRoutes);
 
   // ---------- لوحة التحكم (SPA — كل مسارات /admin تخدم index.html) ----------

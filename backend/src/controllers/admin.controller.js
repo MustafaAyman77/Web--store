@@ -19,6 +19,9 @@ import {
 } from "../services/inventory.service.js";
 import { allowedNext } from "../services/order.service.js";
 import { logAudit } from "../utils/audit.js";
+import {
+  getSettings, updateSettings, listAllZones, createZone, updateZone, deleteZone,
+} from "../services/settings.service.js";
 
 export async function login(req, res) {
   const username = String(req.body?.username || "").trim();
@@ -180,4 +183,38 @@ export function customerUpdate(req, res) {
 
 export function customerDetails(req, res) {
   res.json({ success: true, data: getCustomerDetails(req.params.id) });
+}
+
+/* ================= إعدادات المتجر + مناطق التوصيل ================= */
+
+export function storeSettings(req, res) {
+  res.json({ success: true, data: getSettings() });
+}
+
+export function storeSettingsUpdate(req, res) {
+  const result = updateSettings(req.body || {});
+  logAudit({ actor: req.admin?.username, action: "settings.update", entity: "store", entityId: "1", meta: { keys: Object.keys(req.body || {}) } });
+  res.json({ success: true, data: result });
+}
+
+export function zonesList(req, res) {
+  res.json({ success: true, data: { zones: listAllZones() } });
+}
+
+export function zoneCreate(req, res) {
+  const zone = createZone(req.body || {});
+  logAudit({ actor: req.admin?.username, action: "zone.create", entity: "zone", entityId: zone.id, meta: { name: zone.name } });
+  res.status(201).json({ success: true, data: zone });
+}
+
+export function zoneUpdate(req, res) {
+  const zone = updateZone(req.params.id, req.body || {});
+  logAudit({ actor: req.admin?.username, action: "zone.update", entity: "zone", entityId: zone.id, meta: {} });
+  res.json({ success: true, data: zone });
+}
+
+export function zoneDelete(req, res) {
+  const result = deleteZone(req.params.id);
+  logAudit({ actor: req.admin?.username, action: result.deleted ? "zone.delete" : "zone.disable", entity: "zone", entityId: req.params.id, meta: result });
+  res.json({ success: true, data: result });
 }

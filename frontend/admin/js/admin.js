@@ -323,6 +323,12 @@
         '<a class="ad-card ad-stat" data-link href="/admin/orders?status=out_for_delivery"><span class="n">' + d.outForDeliveryOrders + '</span><span class="l">🛵 خارج للتوصيل</span></a>' +
         '<a class="ad-card ad-stat" data-link href="/admin/orders?status=cancelled"><span class="n">' + d.cancelledOrders + '</span><span class="l">❌ ملغاة</span></a>' +
         "</div>" +
+        '<h2 class="ad-section-title">🏪 حالة المتجر</h2>' +
+        '<div class="ad-stat-grid">' +
+        '<a class="ad-card ad-stat" data-link href="/admin/settings"><span class="n">' + (d.ordersEnabled === false ? "🔴" : "🟢") + '</span><span class="l">استقبال الطلبات</span></a>' +
+        '<a class="ad-card ad-stat" data-link href="/admin/delivery"><span class="n">' + (d.deliveryEnabled === false ? "🔴" : "🟢") + '</span><span class="l">التوصيل (' + (d.zonesCount || 0) + " مناطق)</span></a>" +
+        '<a class="ad-card ad-stat" data-link href="/admin/settings"><span class="n">' + (d.pickupEnabled === false ? "🔴" : "🟢") + '</span><span class="l">الاستلام من المحل</span></a>' +
+        "</div>" +
         '<h2 class="ad-section-title">🕐 آخر الطلبات</h2>' +
         '<div class="ad-list">' +
         (recent.orders.length
@@ -1106,6 +1112,184 @@
     }
   }
 
+  /* ================= إعدادات المتجر ================= */
+
+  function toggleRow(id, label, hint, checked) {
+    return '<label class="ad-toggle">' +
+      '<span class="ad-toggle-text"><b>' + label + "</b>" + (hint ? "<small>" + hint + "</small>" : "") + "</span>" +
+      '<input type="checkbox" id="' + id + '"' + (checked ? " checked" : "") + " />" +
+      '<span class="ad-toggle-ui" aria-hidden="true"></span>' +
+      "</label>";
+  }
+
+  async function pageSettings() {
+    setChrome("settings");
+    document.title = "إعدادات المتجر | لوحة التحكم";
+    view.innerHTML = '<div class="ad-page-head"><div><h1>⚙️ إعدادات المتجر</h1><p>تتحكم في الموقع والطلبات فور الحفظ.</p></div></div>' + skel(4);
+    try {
+      const st = await api("/admin/settings/store");
+      const num = (v) => (v === null || v === undefined ? "" : v);
+      view.innerHTML =
+        '<div class="ad-page-head"><div><h1>⚙️ إعدادات المتجر</h1><p>تتحكم في الموقع والطلبات فور الحفظ.</p></div></div>' +
+        '<section class="ad-card"><h2>🏪 معلومات المتجر</h2>' +
+        '<div class="ad-field"><label for="ssName">اسم المتجر</label><input id="ssName" value="' + esc(st.storeName) + '" /></div>' +
+        '<div class="ad-field"><label for="ssAddress">العنوان</label><input id="ssAddress" value="' + esc(st.storeAddress) + '" /></div>' +
+        '<div class="ad-field"><label for="ssPhone">الهاتف (يظهر للعملاء — اتركه فارغًا إن لم يكن مؤكدًا)</label><input id="ssPhone" dir="ltr" value="' + esc(st.storePhone) + '" /></div>' +
+        '<div class="ad-field"><label for="ssWa">WhatsApp</label><input id="ssWa" dir="ltr" value="' + esc(st.storeWhatsapp) + '" /></div>' +
+        '<div class="ad-field"><label for="ssDesc">الوصف</label><textarea id="ssDesc">' + esc(st.storeDescription) + "</textarea></div>" +
+        '<div class="ad-field"><label for="ssLogo">الشعار (رابط صورة أو Emoji)</label><input id="ssLogo" dir="ltr" value="' + esc(st.storeLogo) + '" /></div>' +
+        "</section>" +
+        '<section class="ad-card"><h2>🟢 حالة المتجر</h2>' +
+        toggleRow("ssOrders", "استقبال الطلبات", "إيقافها يمنع الطلبات الجديدة مع استمرار التصفح.", st.ordersEnabled) +
+        toggleRow("ssMaint", "وضع الصيانة", "يعرض صفحة صيانة للموقع كله (الإدارة تظل تعمل).", st.maintenanceMode) +
+        toggleRow("ss247", "مفتوح 24 ساعة", "يتحكم في نص الحالة بالهيدر.", st.storeOpen247) +
+        "</section>" +
+        '<section class="ad-card"><h2>🚚 التوصيل والاستلام</h2>' +
+        toggleRow("ssDelivery", "التوصيل متاح", "إيقافه يخفي خيار التوصيل من الـCheckout.", st.deliveryEnabled) +
+        toggleRow("ssPickup", "الاستلام من المحل متاح", "إيقافه يخفي خيار الاستلام.", st.pickupEnabled) +
+        '<div class="ad-field"><label for="ssMin">الحد الأدنى العام للطلب (جنيه — 0 = بدون حد)</label><input id="ssMin" type="number" min="0" step="1" dir="ltr" value="' + num(st.minimumOrderAmount) + '" /></div>' +
+        '<div class="ad-field"><label for="ssFree">التوصيل مجاني فوق (جنيه — 0 = معطّل)</label><input id="ssFree" type="number" min="0" step="1" dir="ltr" value="' + num(st.freeDeliveryThreshold) + '" /></div>' +
+        '<div class="ad-field"><label for="ssFee">رسوم التوصيل الافتراضية (جنيه — تُستخدم عند غياب رسم المنطقة)</label><input id="ssFee" type="number" min="0" step="1" dir="ltr" value="' + num(st.defaultDeliveryFee) + '" /></div>' +
+        '<div class="ad-field"><label for="ssPrep">الوقت المتوقع للتجهيز (دقيقة — 0 = إخفاء)</label><input id="ssPrep" type="number" min="0" step="1" dir="ltr" value="' + num(st.estimatedPreparationMinutes) + '" /></div>' +
+        '<div class="ad-field"><label for="ssNote">ملاحظة تظهر للعميل في الـCheckout (اختياري)</label><textarea id="ssNote">' + esc(st.customerOrderNote) + "</textarea></div>" +
+        "</section>" +
+        '<button type="button" class="ad-btn ad-btn-primary ad-btn-block" id="ssSave">💾 حفظ الإعدادات</button>' +
+        '<p style="margin-top:.6rem"><a class="ad-btn ad-btn-outline ad-btn-block" data-link href="/admin/delivery">🛵 إدارة مناطق التوصيل ←</a></p>';
+
+      document.getElementById("ssSave").addEventListener("click", async (e) => {
+        const btn = e.currentTarget;
+        const val = (id) => document.getElementById(id).value.trim();
+        const chk = (id) => document.getElementById(id).checked;
+        if (!chk("ssOrders")) {
+          const ok = await confirmDlg("إيقاف استقبال الطلبات؟", "لن يتمكن العملاء من إنشاء طلبات جديدة حتى إعادة التفعيل.", "إيقاف", true);
+          if (!ok) return;
+        }
+        btn.disabled = true;
+        try {
+          await api("/admin/settings/store", { method: "PATCH", body: {
+            storeName: val("ssName"), storeAddress: val("ssAddress"), storePhone: val("ssPhone"),
+            storeWhatsapp: val("ssWa"), storeDescription: val("ssDesc"), storeLogo: val("ssLogo"),
+            ordersEnabled: chk("ssOrders"), maintenanceMode: chk("ssMaint"), storeOpen247: chk("ss247"),
+            deliveryEnabled: chk("ssDelivery"), pickupEnabled: chk("ssPickup"),
+            minimumOrderAmount: Number(val("ssMin")) || 0, freeDeliveryThreshold: Number(val("ssFree")) || 0,
+            defaultDeliveryFee: Number(val("ssFee")) || 0, estimatedPreparationMinutes: Number(val("ssPrep")) || 0,
+            customerOrderNote: val("ssNote"),
+          } });
+          toast("✅ تم حفظ الإعدادات");
+          pageSettings();
+        } catch (ex) { toast(ex.message || "تعذر الحفظ", true); btn.disabled = false; }
+      });
+    } catch (ex) {
+      view.innerHTML = stateHTML("⚠️", "تعذر تحميل الإعدادات", ex.message || "");
+    }
+  }
+
+  /* ================= إدارة التوصيل ================= */
+
+  async function pageDelivery() {
+    setChrome("delivery");
+    document.title = "إدارة التوصيل | لوحة التحكم";
+    view.innerHTML = '<div class="ad-page-head"><div><h1>🛵 إدارة التوصيل</h1><p>الحالة والمناطق والرسوم.</p></div></div>' + skel(3);
+    try {
+      const [st, zd] = await Promise.all([api("/admin/settings/store"), api("/admin/delivery-zones")]);
+      view.innerHTML =
+        '<div class="ad-page-head"><div><h1>🛵 إدارة التوصيل</h1><p>الحالة والمناطق والرسوم.</p></div></div>' +
+        '<section class="ad-card"><h2>🚚 حالة التوصيل</h2>' +
+        toggleRow("dzEnabled", "التوصيل", st.deliveryEnabled ? "مفعّل — يظهر في الـCheckout" : "معطّل — مخفي عن العملاء", st.deliveryEnabled) +
+        "</section>" +
+        '<div class="ad-page-head"><div><h2 class="ad-section-title" style="margin:0">🗺️ المناطق (' + zd.zones.length + ")</h2></div>" +
+        '<button type="button" class="ad-btn ad-btn-primary ad-btn-sm" id="dzAdd">＋ منطقة جديدة</button></div>' +
+        '<div class="ad-list" id="dzList">' +
+        (zd.zones.length ? zd.zones.map(zoneCard).join("") : stateHTML("🗺️", "لا توجد مناطق", "أضف أول منطقة توصيل.")) +
+        "</div>" +
+        '<div id="dzFormWrap"></div>';
+
+      document.getElementById("dzEnabled").addEventListener("change", async (e) => {
+        try {
+          await api("/admin/settings/store", { method: "PATCH", body: { deliveryEnabled: e.target.checked } });
+          toast(e.target.checked ? "✅ التوصيل مفعّل" : "⏸️ التوصيل معطّل");
+          pageDelivery();
+        } catch (ex) { toast(ex.message || "تعذر الحفظ", true); pageDelivery(); }
+      });
+      document.getElementById("dzAdd").addEventListener("click", () => zoneForm(null));
+      document.querySelectorAll("[data-zone-edit]").forEach((b) =>
+        b.addEventListener("click", () => zoneForm(zd.zones.find((z) => z.id === b.dataset.zoneEdit))));
+      document.querySelectorAll("[data-zone-toggle]").forEach((b) =>
+        b.addEventListener("click", async () => {
+          const z = zd.zones.find((x) => x.id === b.dataset.zoneToggle);
+          try {
+            await api("/admin/delivery-zones/" + encodeURIComponent(z.id), { method: "PATCH", body: { enabled: !z.enabled } });
+            toast("✅ تم التحديث");
+            pageDelivery();
+          } catch (ex) { toast(ex.message || "تعذر الحفظ", true); }
+        }));
+      document.querySelectorAll("[data-zone-del]").forEach((b) =>
+        b.addEventListener("click", async () => {
+          const z = zd.zones.find((x) => x.id === b.dataset.zoneDel);
+          const ok = await confirmDlg("حذف المنطقة؟", "«" + z.name + "» — المرتبطة بطلبات قديمة تُعطَّل بدل الحذف.", "حذف", true);
+          if (!ok) return;
+          try {
+            const r = await api("/admin/delivery-zones/" + encodeURIComponent(z.id), { method: "DELETE" });
+            toast(r.deleted ? "🗑️ تم حذف المنطقة" : "⏸️ المنطقة مرتبطة بطلبات — تم تعطيلها");
+            pageDelivery();
+          } catch (ex) { toast(ex.message || "تعذر الحذف", true); }
+        }));
+    } catch (ex) {
+      view.innerHTML = stateHTML("⚠️", "تعذر تحميل التوصيل", ex.message || "");
+    }
+  }
+
+  function zoneCard(z) {
+    return '<div class="ad-card ad-row-card">' +
+      '<div class="ad-row-top"><strong>🗺️ ' + esc(z.name) + "</strong>" +
+      (z.enabled ? '<span class="st st-confirmed">مفعلة ✅</span>' : '<span class="st st-cancelled">معطلة ⏸️</span>') + "</div>" +
+      '<div class="ad-row-meta"><span>🚚 <b>' + fmtPrice(z.deliveryFee) + "</b></span>" +
+      "<span>📦 الحد الأدنى: <b>" + fmtPrice(z.minimumOrderAmount) + "</b></span>" +
+      "<span>⏱️ " + (z.estimatedMinutes > 0 ? z.estimatedMinutes + " دقيقة" : "—") + "</span></div>" +
+      (z.description ? '<p style="font-size:.82rem;color:var(--muted)">' + esc(z.description) + "</p>" : "") +
+      '<div class="ad-row-actions">' +
+      '<button type="button" class="ad-btn ad-btn-outline ad-btn-sm" data-zone-edit="' + esc(z.id) + '">✏️ تعديل</button>' +
+      '<button type="button" class="ad-btn ad-btn-outline ad-btn-sm" data-zone-toggle="' + esc(z.id) + '">' + (z.enabled ? "⏸️ تعطيل" : "▶️ تفعيل") + "</button>" +
+      '<button type="button" class="ad-btn ad-btn-danger ad-btn-sm" data-zone-del="' + esc(z.id) + '">🗑️ حذف</button>' +
+      "</div></div>";
+  }
+
+  function zoneForm(z) {
+    const wrap = document.getElementById("dzFormWrap");
+    const isNew = !z;
+    z = z || { name: "", description: "", deliveryFee: 0, minimumOrderAmount: 0, estimatedMinutes: 0, enabled: true };
+    wrap.innerHTML =
+      '<section class="ad-card"><h2>' + (isNew ? "＋ منطقة جديدة" : "✏️ تعديل: " + esc(z.name)) + "</h2>" +
+      '<div class="ad-field"><label for="zfName">اسم المنطقة</label><input id="zfName" value="' + esc(z.name) + '" /></div>' +
+      '<div class="ad-field"><label for="zfDesc">الوصف (اختياري)</label><input id="zfDesc" value="' + esc(z.description) + '" /></div>' +
+      '<div class="ad-field"><label for="zfFee">رسوم التوصيل (جنيه)</label><input id="zfFee" type="number" min="0" step="1" dir="ltr" value="' + z.deliveryFee + '" /></div>' +
+      '<div class="ad-field"><label for="zfMin">الحد الأدنى للطلب (جنيه — 0 = بدون حد)</label><input id="zfMin" type="number" min="0" step="1" dir="ltr" value="' + z.minimumOrderAmount + '" /></div>' +
+      '<div class="ad-field"><label for="zfEst">الوقت المتوقع (دقيقة — 0 = إخفاء)</label><input id="zfEst" type="number" min="0" step="1" dir="ltr" value="' + z.estimatedMinutes + '" /></div>' +
+      toggleRow("zfEnabled", "المنطقة مفعلة", "", z.enabled) +
+      '<div style="display:flex;gap:.5rem;margin-top:.6rem"><button type="button" class="ad-btn ad-btn-primary" id="zfSave">💾 حفظ</button>' +
+      '<button type="button" class="ad-btn ad-btn-outline" id="zfCancel">إلغاء</button></div></section>';
+    wrap.scrollIntoView({ behavior: "smooth", block: "center" });
+    document.getElementById("zfCancel").addEventListener("click", () => { wrap.innerHTML = ""; });
+    document.getElementById("zfSave").addEventListener("click", async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      const body = {
+        name: document.getElementById("zfName").value.trim(),
+        description: document.getElementById("zfDesc").value.trim(),
+        deliveryFee: Number(document.getElementById("zfFee").value) || 0,
+        minimumOrderAmount: Number(document.getElementById("zfMin").value) || 0,
+        estimatedMinutes: Number(document.getElementById("zfEst").value) || 0,
+        enabled: document.getElementById("zfEnabled").checked,
+      };
+      try {
+        if (isNew) await api("/admin/delivery-zones", { method: "POST", body });
+        else await api("/admin/delivery-zones/" + encodeURIComponent(z.id), { method: "PATCH", body });
+        toast("✅ تم حفظ المنطقة");
+        pageDelivery();
+      } catch (ex) { toast(ex.message || "تعذر الحفظ", true); btn.disabled = false; }
+    });
+  }
+
   /* ================= التوجيه ================= */
 
   function render() {
@@ -1125,6 +1309,8 @@
     if (path === "/admin/categories") return void pageCategories();
     if (path === "/admin/customers") return void pageCustomers();
     if ((m = path.match(/^\/admin\/customers\/(.+)$/))) return void pageCustomerDetails(decodeURIComponent(m[1]));
+    if (path === "/admin/settings") return void pageSettings();
+    if (path === "/admin/delivery") return void pageDelivery();
     setChrome("dashboard");
     view.innerHTML = stateHTML("🔍", "الصفحة غير موجودة", "تأكد من الرابط وحاول مجددًا.", '<a class="ad-btn ad-btn-primary" data-link href="/admin/">الرئيسية</a>');
   }

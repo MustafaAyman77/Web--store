@@ -142,6 +142,9 @@
           orderNo: data.data.orderNumber,
           total: data.data.total,
           status: data.data.status,
+          deliveryFee: data.data.deliveryFee,
+          deliveryZoneName: data.data.deliveryZoneName,
+          fulfillmentMethod: data.data.fulfillmentMethod,
         };
       } catch (err) {
         clearTimeout(timer);

@@ -117,6 +117,7 @@
         deliveryFee: null,
         total: subtotal,
         fulfillmentMethod: input.fulfillmentMethod === "pickup" ? "pickup" : "delivery",
+        deliveryZoneId: String(input.deliveryZoneId || ""),
         notes: String(input.notes || ""),
         status: "new",
       },
@@ -161,6 +162,7 @@
         items: payload.items.map((it) => ({ productId: it.productId, quantity: it.quantity })),
         customer: payload.customer,
         fulfillmentMethod: payload.fulfillmentMethod,
+        deliveryZoneId: payload.deliveryZoneId || "",
         notes: payload.notes,
       };
       const res = await Api.submitOrder(minimal);
@@ -171,6 +173,8 @@
           orderNumber: res.orderNo || payload.orderId,
           status: res.status || "new",
           serverTotal: res.total,
+          serverDeliveryFee: res.deliveryFee,
+          serverZoneName: res.deliveryZoneName,
           mode: "backend",
         };
         persistOrder(order);

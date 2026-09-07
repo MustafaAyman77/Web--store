@@ -46,6 +46,8 @@
           '<div class="summary-line"><span>👤 الاسم</span><b>' + UI.esc(order.customer.name) + "</b></div>" +
           '<div class="summary-line"><span>📞 الهاتف</span><b>' + UI.esc(order.customer.phone) + "</b></div>" +
           '<div class="summary-line"><span>🚚 الاستلام</span><b>' + method + "</b></div>" +
+          (order.serverZoneName ? '<div class="summary-line"><span>🗺️ المنطقة</span><b>' + UI.esc(order.serverZoneName) + "</b></div>" : "") +
+          (order.serverDeliveryFee !== undefined && order.serverDeliveryFee !== null ? '<div class="summary-line"><span>🚚 رسوم التوصيل</span><b>' + UI.fmtPrice(order.serverDeliveryFee) + "</b></div>" : "") +
           '<div class="summary-line"><span>🛍️ المنتجات</span><b>' + count + " قطعة</b></div>" +
           '<div class="summary-total"><span>الإجمالي</span><output>' + UI.fmtPrice(total) + "</output></div>" +
         "</div>" +

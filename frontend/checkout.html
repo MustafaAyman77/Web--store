@@ -96,6 +96,8 @@
         <div class="co-stack">
           <form class="co-card" id="checkoutForm" novalidate aria-label="بيانات إتمام الطلب">
             <h3>👤 بياناتك</h3>
+            <div class="store-note" id="coStoreNote" hidden></div>
+            <div class="store-gate" id="coGate" role="alert" hidden></div>
             <div class="form-grid">
               <div class="field">
                 <label for="coName">الاسم الكامل <i>*</i></label>
@@ -108,7 +110,7 @@
 
               <fieldset style="border:0">
                 <legend style="font-size:.85rem;font-weight:800;margin-bottom:.5rem">🚚 طريقة استلام الطلب</legend>
-                <div class="fulfill-grid">
+                <div class="fulfill-grid" id="fulfillGrid">
                   <label class="fulfill-card is-selected">
                     <input type="radio" name="fulfill" value="delivery" checked />
                     <span class="fc-icon" aria-hidden="true">🚚</span>
@@ -129,6 +131,11 @@
               </fieldset>
 
               <div class="address-group" id="addressGroup">
+                <div class="field" id="zoneField">
+                  <label for="coZone">منطقة التوصيل <i>*</i></label>
+                  <select id="coZone"></select>
+                  <p class="zone-info" id="coZoneInfo" aria-live="polite"></p>
+                </div>
                 <div class="field">
                   <label for="coAddress">العنوان <i>*</i></label>
                   <input id="coAddress" name="address" type="text" placeholder="اكتب عنوان التوصيل" autocomplete="street-address" />
@@ -249,6 +256,7 @@
   <script src="js/api.js"></script>
   <script src="js/recs.js"></script>
   <script src="js/auth.js"></script>
+  <script src="js/store.js"></script>
   <script src="js/notif.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/orders.js"></script>

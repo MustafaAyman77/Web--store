@@ -128,6 +128,29 @@ function migrate(database) {
     UNIQUE (customer_id, order_id, type));`);
   database.exec("CREATE INDEX IF NOT EXISTS idx_notif_customer ON notifications(customer_id, created_at);");
   database.exec("CREATE INDEX IF NOT EXISTS idx_notif_unread ON notifications(customer_id, is_read);");
+  // --- المرحلة 11: إعدادات المتجر + مناطق التوصيل + حقول المنطقة في الطلبات ---
+  database.exec(`CREATE TABLE IF NOT EXISTS store_settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1), store_name TEXT NOT NULL DEFAULT 'أسواق البسيط',
+    store_address TEXT NOT NULL DEFAULT '', store_phone TEXT NOT NULL DEFAULT '',
+    store_whatsapp TEXT NOT NULL DEFAULT '', store_description TEXT NOT NULL DEFAULT '',
+    store_logo TEXT NOT NULL DEFAULT '', store_latitude REAL, store_longitude REAL,
+    store_open_24_7 INTEGER NOT NULL DEFAULT 1, orders_enabled INTEGER NOT NULL DEFAULT 1,
+    delivery_enabled INTEGER NOT NULL DEFAULT 1, pickup_enabled INTEGER NOT NULL DEFAULT 1,
+    minimum_order_amount REAL NOT NULL DEFAULT 0, free_delivery_threshold REAL NOT NULL DEFAULT 0,
+    default_delivery_fee REAL NOT NULL DEFAULT 0, estimated_preparation_minutes INTEGER NOT NULL DEFAULT 0,
+    customer_order_note TEXT NOT NULL DEFAULT '', maintenance_mode INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')));`);
+  database.exec(`CREATE TABLE IF NOT EXISTS delivery_zones (
+    id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
+    delivery_fee REAL NOT NULL DEFAULT 0, minimum_order_amount REAL NOT NULL DEFAULT 0,
+    estimated_minutes INTEGER NOT NULL DEFAULT 0, enabled INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')));`);
+  database.exec("CREATE INDEX IF NOT EXISTS idx_zones_enabled ON delivery_zones(enabled);");
+  const orderCols11 = database.prepare("PRAGMA table_info(orders);").all().map((c) => c.name);
+  if (!orderCols11.includes("delivery_zone_id")) database.exec("ALTER TABLE orders ADD COLUMN delivery_zone_id TEXT;");
+  if (!orderCols11.includes("delivery_zone_name")) database.exec("ALTER TABLE orders ADD COLUMN delivery_zone_name TEXT DEFAULT '';");
+  seedStoreSettings(database);
+  seedDeliveryZones(database);
   const adminCols = database.prepare("PRAGMA table_info(admins);").all().map((c) => c.name);
   if (!adminCols.includes("role")) {
     database.exec("ALTER TABLE admins ADD COLUMN role TEXT NOT NULL DEFAULT 'owner';");
@@ -145,6 +168,39 @@ const DEFAULT_CATEGORIES = [
   ["home", "مستلزمات المنزل", "🏠", 8],
   ["offers", "عروض مجمعة", "🎁", 9],
 ];
+
+/** زراعة صف إعدادات المتجر مرة واحدة — القيم الأولية من .env ثم تُدار من الإدارة */
+function seedStoreSettings(database) {
+  const row = database.prepare("SELECT id FROM store_settings WHERE id = 1;").get();
+  if (row) return;
+  database.prepare(
+    `INSERT INTO store_settings (id, store_name, store_address, store_description, store_open_24_7,
+      orders_enabled, delivery_enabled, pickup_enabled, minimum_order_amount,
+      free_delivery_threshold, default_delivery_fee, estimated_preparation_minutes)
+     VALUES (1, ?, ?, ?, 1, 1, ?, 1, 0, 0, ?, 0);`
+  ).run(
+    "أسواق البسيط",
+    "شارع الحجاز، مدينة مغاغة، محافظة المنيا، مصر",
+    "سوبر ماركت في شارع الحجاز، مدينة مغاغة — محافظة المنيا.",
+    (typeof env !== "undefined" && env.delivery && env.delivery.enabled) ? 1 : 0,
+    (typeof env !== "undefined" && env.delivery) ? (Number(env.delivery.fee) || 0) : 0
+  );
+}
+
+/** 3 مناطق تجريبية واضحة — تُستبدل ببيانات المحل الحقيقية من الإدارة */
+function seedDeliveryZones(database) {
+  const { count } = database.prepare("SELECT COUNT(*) AS count FROM delivery_zones;").get();
+  if (count > 0) return;
+  const zones = [
+    ["dz-demo-1", "المنطقة التجريبية 1", "بيانات تجريبية — تُعدَّل من لوحة التحكم.", 10, 0, 30],
+    ["dz-demo-2", "المنطقة التجريبية 2", "بيانات تجريبية — تُعدَّل من لوحة التحكم.", 15, 50, 45],
+    ["dz-demo-3", "المنطقة التجريبية 3", "بيانات تجريبية — تُعدَّل من لوحة التحكم.", 20, 100, 60],
+  ];
+  const ins = database.prepare(
+    "INSERT INTO delivery_zones (id, name, description, delivery_fee, minimum_order_amount, estimated_minutes, enabled) VALUES (?, ?, ?, ?, ?, ?, 1);"
+  );
+  zones.forEach((z) => ins.run(...z));
+}
 
 /** زراعة الأقسام الافتراضية مرة واحدة (لا تمس أي بيانات موجودة) */
 function seedCategories(database) {

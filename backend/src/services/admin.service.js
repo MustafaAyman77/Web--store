@@ -81,7 +81,24 @@ export function getDashboard() {
     lowStockCount: lowCount.n || 0,
     outOfStockCount: outRow.n || 0,
     restockCount: (lowCount.n || 0) + (outRow.n || 0),
+    ...storeCards(db),
   };
+}
+
+function storeCards(db) {
+  try {
+    const s = db.prepare("SELECT orders_enabled, delivery_enabled, pickup_enabled, maintenance_mode FROM store_settings WHERE id = 1;").get();
+    const z = db.prepare("SELECT COUNT(*) AS n FROM delivery_zones WHERE enabled = 1;").get();
+    return {
+      ordersEnabled: Number(s?.orders_enabled) === 1,
+      deliveryEnabled: Number(s?.delivery_enabled) === 1,
+      pickupEnabled: Number(s?.pickup_enabled) === 1,
+      maintenanceMode: Number(s?.maintenance_mode) === 1,
+      zonesCount: z?.n || 0,
+    };
+  } catch {
+    return {};
+  }
 }
 
 /* ================= تفاصيل طلب (للإدارة) ================= */

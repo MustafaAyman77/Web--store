@@ -178,6 +178,10 @@ function buildOrderMessage({ order, customer, items }) {
   lines.push(`💵 <b>الإجمالي:</b>\n${order.total} جنيه`);
   lines.push("");
   lines.push(`📦 <b>طريقة الاستلام:</b>\n${FULFILL_AR[order.fulfillment_method] || order.fulfillment_method}`);
+  if (order.fulfillment_method === "delivery" && order.delivery_zone_name) {
+    lines.push("");
+    lines.push(`🗺️ <b>منطقة التوصيل:</b>\n${escapeHtml(order.delivery_zone_name)}`);
+  }
   if (order.notes) {
     lines.push("");
     lines.push(`📝 <b>ملاحظات:</b>\n${escapeHtml(order.notes)}`);

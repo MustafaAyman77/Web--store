@@ -8,9 +8,12 @@
 
   const $ = (sel, root) => (root || document).querySelector(sel);
 
-  let Cart, UI, Orders;
+  let Cart, UI, Orders, Store;
   let fulfillment = "delivery";
   let submitting = false;
+  let zoneId = "";
+  let quoteCache = null;
+  let quoteTimer = null;
 
   function onPage() {
     return !!document.getElementById("coContent");
@@ -67,9 +70,53 @@
       (Cart.savings() > 0
         ? '<div class="total-row is-save"><span>🎉 التوفير</span><output>' + UI.fmtPrice(Cart.savings()) + "</output></div>"
         : "") +
-      '<div class="total-row"><span>🚚 التوصيل</span><output class="pending">سيتم تحديده لاحقًا</output></div>' +
-      '<div class="total-row grand"><span>الإجمالي</span><output>' + UI.fmtPrice(Cart.total()) + "</output></div>" +
+      '<div class="total-row"><span id="coShipLabel">🚚 التوصيل</span><output id="coShipVal" class="pending">—</output></div>' +
+      '<div class="total-row grand"><span>الإجمالي</span><output id="coGrandVal">' + UI.fmtPrice(Cart.total()) + "</output></div>" +
       '<button type="button" class="btn btn-outline btn-block" data-edit-cart>🛠️ تعديل السلة</button>';
+    refreshQuote();
+  }
+
+  function quoteItems() {
+    return Cart.lines().map((l) => ({ productId: l.id, quantity: l.qty }));
+  }
+
+  /** عرض السعر من السيرفر (نفس حساب الإنشاء) — يُحدَّث مع كل تغيير */
+  function refreshQuote() {
+    clearTimeout(quoteTimer);
+    quoteTimer = setTimeout(async () => {
+      const shipVal = document.getElementById("coShipVal");
+      const shipLabel = document.getElementById("coShipLabel");
+      const grandVal = document.getElementById("coGrandVal");
+      if (!shipVal || !grandVal) return;
+      try {
+        if (!Store) throw new Error("no store");
+        const q = await Store.quote(quoteItems(), fulfillment, fulfillment === "delivery" ? zoneId : "");
+        quoteCache = q;
+        if (shipLabel) shipLabel.textContent = fulfillment === "pickup" ? "🏪 الاستلام" : "🚚 التوصيل";
+        if (fulfillment === "pickup" || q.deliveryFee === null || q.deliveryFee === undefined) {
+          shipVal.textContent = fulfillment === "pickup" ? "من المحل" : "—";
+        } else {
+          shipVal.textContent = q.deliveryFee === 0 ? "مجانًا 🎉" : UI.fmtPrice(q.deliveryFee);
+        }
+        shipVal.classList.remove("pending");
+        grandVal.textContent = UI.fmtPrice(q.total);
+      } catch (e) {
+        quoteCache = null;
+        if (fulfillment === "pickup") {
+          if (shipLabel) shipLabel.textContent = "🏪 الاستلام";
+          shipVal.textContent = "من المحل";
+          shipVal.classList.remove("pending");
+        } else {
+          if (shipLabel) shipLabel.textContent = "🚚 التوصيل";
+          const z = Store ? Store.zoneById(zoneId) : null;
+          if (z) { shipVal.textContent = "~ " + UI.fmtPrice(z.deliveryFee); }
+          else { shipVal.textContent = "اختر المنطقة"; }
+          shipVal.classList.add("pending");
+        }
+        grandVal.textContent = UI.fmtPrice(Cart.total());
+      }
+      renderReview();
+    }, 250);
   }
 
   /* ================= قراءة النموذج والمراجعة ================= */
@@ -107,13 +154,16 @@
       '<div class="review-row"><span class="rk">📞 الهاتف</span>' + cell(vals.phone) + "</div>" +
       '<div class="review-row"><span class="rk">🚚 الاستلام</span><span class="rv">' +
         (fulfillment === "pickup" ? "🏪 استلام من المحل" : "🚚 توصيل للمنزل") + "</span></div>" +
+      (fulfillment === "delivery" && Store && Store.zoneById(zoneId)
+        ? '<div class="review-row"><span class="rk">🗺️ المنطقة</span><span class="rv">' + UI.esc(Store.zoneById(zoneId).name) + "</span></div>"
+        : "") +
       (fulfillment === "delivery"
         ? '<div class="review-row"><span class="rk">📍 العنوان</span>' + cell(addr) + "</div>"
         : "") +
       '<div class="review-row"><span class="rk">🛍️ المنتجات</span><span class="rv">' +
         Cart.count() + " قطعة</span></div>" +
       '<div class="review-row"><span class="rk">💰 الإجمالي</span><span class="rv is-total">' +
-        UI.fmtPrice(Cart.total()) + "</span></div>" +
+        UI.fmtPrice(quoteCache && quoteCache.total !== undefined ? quoteCache.total : Cart.total()) + "</span></div>" +
       '<div class="review-row"><span class="rk">📌 الملاحظات</span>' + cell(vals.notes) + "</div>" +
       "</div>";
   }
@@ -190,6 +240,11 @@
     if (perr) fail("coPhone", perr);
 
     if (fulfillment === "delivery") {
+      const zoneInput = document.getElementById("coZone");
+      clearFieldError(zoneInput);
+      if (!zoneId || !(Store && Store.zoneById(zoneId))) {
+        fail("coZone", "من فضلك اختر منطقة التوصيل.");
+      }
       const addrInput = document.getElementById("coAddress");
       clearFieldError(addrInput);
       if (!vals.address || vals.address.length < 5) {
@@ -253,6 +308,7 @@
           landmark: fulfillment === "delivery" ? vals.landmark : "",
         },
         fulfillmentMethod: fulfillment,
+        deliveryZoneId: fulfillment === "delivery" ? zoneId : "",
         notes: vals.notes,
       });
 
@@ -279,9 +335,14 @@
         window.location.href = "success.html";
       } else {
         const code = res && res.code;
-        if (code === "DELIVERY_DISABLED") {
-          showFormError("خدمة التوصيل غير متاحة حاليًا — اختر الاستلام من المحل.");
-          applyDeliveryAvailability(false);
+        if (code === "DELIVERY_DISABLED" || code === "PICKUP_DISABLED" || code === "NO_FULFILLMENT" ||
+            code === "ZONE_REQUIRED" || code === "ZONE_INVALID" || code === "MINIMUM_ORDER" ||
+            code === "ORDERS_DISABLED" || code === "MAINTENANCE_MODE") {
+          // تغيّرت إعدادات المتجر — نُحدّث الواجهة من السيرفر ونعرض رسالته
+          try { if (Store) await Store.refresh(); } catch (e) { /* تجاهل */ }
+          setupFulfillment();
+          renderSummary();
+          showFormError((res && res.error) || "تعذر إنشاء الطلب — تحقق من الإعدادات المتاحة.");
         } else if (code === "PRODUCT_UNAVAILABLE" || code === "INSUFFICIENT_STOCK" ||
                    code === "PRODUCT_NOT_FOUND" || code === "INVALID_PRICE") {
           showFormError((res && res.error) || "أحد المنتجات في طلبك لم يعد متوفرًا.");
@@ -319,6 +380,14 @@
         if (e.target.name === "fulfill") {
           fulfillment = e.target.value === "pickup" ? "pickup" : "delivery";
           applyFulfillment();
+          renderZoneInfo();
+          renderSummary();
+        }
+        if (e.target.id === "coZone") {
+          zoneId = e.target.value || "";
+          clearFieldError(e.target);
+          renderZoneInfo();
+          renderSummary();
         }
       });
     }
@@ -332,49 +401,106 @@
       if (!onPage() || submitting) return;
       renderSummary();
       renderReview();
+      refreshQuote();
     });
   }
 
-  /* ================= إتاحة التوصيل من السيرفر ================= */
+  /* ================= إعدادات المتجر (البوابات + المناطق) ================= */
 
-  async function fetchDeliveryConfig() {
-    try {
-      const cfg = await global.Basit.Api.getPublicConfig();
-      if (cfg && cfg.deliveryEnabled === false) applyDeliveryAvailability(false);
-    } catch (e) { /* الوضع المحلي — الخياران متاحان */ }
+  function fulfillCard(value, icon, title, sub, selected) {
+    return '<label class="fulfill-card' + (selected ? " is-selected" : "") + '">' +
+      '<input type="radio" name="fulfill" value="' + value + '"' + (selected ? " checked" : "") + " />" +
+      '<span class="fc-icon" aria-hidden="true">' + icon + "</span>" +
+      '<span class="fc-text"><strong>' + title + "</strong><small>" + sub + "</small></span>" +
+      "</label>";
   }
 
-  function applyDeliveryAvailability(enabled) {
-    if (enabled) return;
-    const radio = document.querySelector('input[name="fulfill"][value="delivery"]');
-    const pickup = document.querySelector('input[name="fulfill"][value="pickup"]');
-    if (radio) {
-      radio.disabled = true;
-      radio.checked = false;
-      const card = radio.closest(".fulfill-card");
-      if (card) {
-        card.classList.add("is-off");
-        const small = card.querySelector(".fc-text small");
-        if (small) small.textContent = "غير متاح حاليًا.";
+  function setupFulfillment() {
+    if (!Store) return;
+    const st = Store.get();
+    const zones = Store.zones();
+    const noteBox = document.getElementById("coStoreNote");
+    if (noteBox) {
+      if (st.customerOrderNote) {
+        noteBox.hidden = false;
+        noteBox.innerHTML = "📌 " + UI.esc(st.customerOrderNote);
+      } else {
+        noteBox.hidden = true;
       }
     }
-    if (pickup) pickup.checked = true;
-    fulfillment = "pickup";
+    const gate = document.getElementById("coGate");
+    const confirmBtn = document.getElementById("confirmBtn");
+    const blocked = !st.ordersEnabled || (!st.deliveryEnabled && !st.pickupEnabled);
+    if (gate) {
+      if (!st.ordersEnabled) {
+        gate.hidden = false;
+        gate.innerHTML = "⛔ الطلبات غير متاحة حاليًا، يمكنك تصفح المنتجات والعودة لاحقًا.";
+      } else if (!st.deliveryEnabled && !st.pickupEnabled) {
+        gate.hidden = false;
+        gate.innerHTML = "⛔ المتجر لا يوفر طرق استلام متاحة حاليًا.";
+      } else {
+        gate.hidden = true;
+      }
+    }
+    if (confirmBtn) confirmBtn.disabled = blocked;
+    const grid = document.getElementById("fulfillGrid");
+    if (grid) {
+      if (!st.deliveryEnabled && !st.pickupEnabled) {
+        grid.innerHTML = '<p class="fulfill-none">المتجر لا يوفر طرق استلام متاحة حاليًا.</p>';
+      } else {
+        if (fulfillment === "delivery" && !st.deliveryEnabled) fulfillment = "pickup";
+        if (fulfillment === "pickup" && !st.pickupEnabled) fulfillment = "delivery";
+        const zoneHint = zones.length ? zones.length + " مناطق متاحة" : "لا توجد مناطق مفعلة";
+        grid.innerHTML =
+          (st.deliveryEnabled ? fulfillCard("delivery", "🚚", "توصيل للمنزل", UI.esc(zoneHint), fulfillment === "delivery") : "") +
+          (st.pickupEnabled ? fulfillCard("pickup", "🏪", "استلام من المحل", UI.esc(st.storeAddress || "من عنوان المحل."), fulfillment === "pickup") : "");
+      }
+    }
+    renderZoneField();
     applyFulfillment();
-    UI.toast("التوصيل غير متاح حاليًا — الاستلام من المحل متاح", "🏪");
   }
 
-  function init() {
+  function renderZoneField() {
+    const sel = document.getElementById("coZone");
+    const field = document.getElementById("zoneField");
+    if (!sel || !field || !Store) return;
+    const zones = Store.zones();
+    if (!zoneId || !Store.zoneById(zoneId)) zoneId = zones.length === 1 ? zones[0].id : "";
+    sel.innerHTML = '<option value="">— اختر المنطقة —</option>' +
+      zones.map((z) => '<option value="' + UI.esc(z.id) + '"' + (z.id === zoneId ? " selected" : "") + ">" +
+        UI.esc(z.name) + " — توصيل " + UI.fmtPrice(z.deliveryFee) + "</option>").join("");
+    renderZoneInfo();
+  }
+
+  function renderZoneInfo() {
+    const info = document.getElementById("coZoneInfo");
+    if (!info || !Store) return;
+    const z = Store.zoneById(zoneId);
+    const st = Store.get();
+    if (!z) { info.innerHTML = ""; return; }
+    const parts = ["🚚 رسوم التوصيل: <b>" + UI.fmtPrice(z.deliveryFee) + "</b>"];
+    const min = z.minimumOrderAmount > 0 ? z.minimumOrderAmount : st.minimumOrderAmount;
+    if (min > 0) parts.push("الحد الأدنى: <b>" + UI.fmtPrice(min) + "</b>");
+    if (z.estimatedMinutes > 0) parts.push("الوقت المتوقع: <b>" + z.estimatedMinutes + " دقيقة</b>");
+    if (st.freeDeliveryThreshold > 0) parts.push("🎉 التوصيل مجاني فوق <b>" + UI.fmtPrice(st.freeDeliveryThreshold) + "</b>");
+    info.innerHTML = parts.join(" • ");
+  }
+
+  async function init() {
     Cart = global.Basit.Cart;
     UI = global.Basit.UI;
     Orders = global.Basit.Orders;
+    Store = global.Basit.Store || null;
     if (!onPage() || !Cart || !UI || !Orders) return;
     bind();
+    if (Store) {
+      try { await Store.ensure(); } catch (e) { /* الوضع المحلي */ }
+      setupFulfillment();
+    }
     prefillCustomer();
     applyFulfillment();
     renderSummary();
     renderReview();
-    fetchDeliveryConfig();
     if (UI.renderCheckoutRecs) UI.renderCheckoutRecs();
   }
 

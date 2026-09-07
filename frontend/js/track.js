@@ -77,6 +77,14 @@
     }).join("") + "</ol>";
   }
 
+  function prepLine() {
+    try {
+      const mins = global.Basit.Store ? global.Basit.Store.get().estimatedPreparationMinutes : 0;
+      if (mins > 0) return '<p class="acc-muted">⏱️ الوقت المتوقع للتجهيز: ' + mins + " دقيقة</p>";
+    } catch (e) { /* تجاهل */ }
+    return "";
+  }
+
   function historyList(hist) {
     if (!hist || !hist.length) return "";
     return '<div class="track-history"><h3>🕘 تطور الطلب</h3><ul>' +
@@ -120,7 +128,9 @@
       "<h2>طلب #" + esc(order.orderNumber) + "</h2>" +
       '<p><span class="acc-status st-' + esc(order.status) + '">' + esc(STATUS[order.status] || "") + "</span></p>" +
       '<p class="acc-muted">🕘 آخر تحديث: ' + esc(ago(order.updatedAt || order.createdAt)) + " • " +
-      (order.fulfillmentMethod === "pickup" ? "🏪 استلام من المحل" : "🚚 توصيل للمنزل") + "</p>" +
+      (order.fulfillmentMethod === "pickup" ? "🏪 استلام من المحل" : "🚚 توصيل للمنزل") +
+      (order.deliveryZoneName ? " • 🗺️ " + esc(order.deliveryZoneName) : "") + "</p>" +
+      prepLine() +
       timeline(order) +
       historyList(order.statusHistory) +
       '<div class="acc-items">' +

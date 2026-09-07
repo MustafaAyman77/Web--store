@@ -2,11 +2,15 @@
 // Orders Controller — إنشاء الطلبات (للجميع) + تتبع الضيف (طلب + هاتف)
 // 🛡️ لا يوجد أي مسار عام يكشف طلبًا برقمه فقط — التتبع يتطلب الهاتف المطابق.
 // ==========================================================================
-import { createOrder, trackOrder } from "../services/order.service.js";
+import { createOrder, trackOrder, quoteTotals } from "../services/order.service.js";
 
 export async function create(req, res) {
   const result = await createOrder(req.body || {});
   res.status(201).json({ success: true, data: result });
+}
+
+export function quote(req, res) {
+  res.json({ success: true, data: quoteTotals(req.body || {}) });
 }
 
 export function track(req, res) {
