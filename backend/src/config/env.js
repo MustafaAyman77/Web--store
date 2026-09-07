@@ -43,6 +43,7 @@ export const env = {
     enabled: toBool(process.env.TELEGRAM_ENABLED, false),
     botToken: process.env.TELEGRAM_BOT_TOKEN || "",
     chatId: process.env.TELEGRAM_CHAT_ID || "",
+    timeoutMs: toInt(process.env.TELEGRAM_TIMEOUT_MS, 10000),
   },
 };
 

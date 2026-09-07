@@ -68,7 +68,10 @@ npm run dev     # تشغيل السيرفر مع إعادة التحميل ال�
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | دخول الأدمن (تُشفَّر عند الـ seed) | `admin` / `admin123` (Demo — غيّرها) |
 | `DELIVERY_ENABLED` | قبول التوصيل (`false` = استلام فقط) | `true` |
 | `DELIVERY_FEE` | رسوم التوصيل (تُحدد لاحقًا) | `0` |
-| `TELEGRAM_ENABLED` | التفعيل في المرحلة 5 فقط | `false` |
+| `TELEGRAM_ENABLED` | تفعيل إشعارات Telegram لصاحب المحل | `false` |
+| `TELEGRAM_BOT_TOKEN` | توكن البوت (في `.env` فقط — لا يدخل Git) | فارغ |
+| `TELEGRAM_CHAT_ID` | شات صاحب المحل (في `.env` فقط) | فارغ |
+| `TELEGRAM_TIMEOUT_MS` | مهلة الاتصال بـ Telegram | `10000` |
 
 ⚠️ ملف `.env` وقاعدة البيانات لا يدخلان Git أبدًا. لا توجد أسرار في الواجهة.
 
@@ -110,7 +113,40 @@ TOKEN=$(curl -s -X POST localhost:3000/api/admin/login \
 curl "localhost:3000/api/admin/orders" -H "Authorization: Bearer $TOKEN"
 ```
 
-## 6. رحلة المستخدم الكاملة
+## 6. إشعارات Telegram لصاحب المحل 📨 (المرحلة 5)
+
+كل طلب جديد يُحفظ في قاعدة البيانات أولًا، ثم يُرسل إشعار عربي منسق
+لشات صاحب المحل — والعميل لا يرى أي شيء عن Telegram.
+
+- حالة الإرسال تُسجَّل لكل طلب: `pending / sending / sent / failed / disabled`.
+- فشل Telegram **لا يُفشل الطلب أبدًا** — الطلب يظل محفوظًا وناجحًا.
+- منع التكرار: الطلب المُرسل لا يُعاد إرساله إلا بطلب صريح (`force`).
+
+### التفعيل (بوت تجريبي أو بوت المحل لاحقًا)
+
+```bash
+# 1) أنشئ بوتًا من @BotFather وخُذ التوكن
+# 2) ابدأ محادثة مع البوت، ثم اعرف الـ Chat ID من:
+#    https://api.telegram.org/bot<TOKEN>/getUpdates
+# 3) ضع القيم في backend/.env فقط (لا تدخل Git أبدًا):
+TELEGRAM_ENABLED=true
+TELEGRAM_BOT_TOKEN=ضع_التوكن_هنا
+TELEGRAM_CHAT_ID=ضع_الشات_هنا
+
+# 4) أعد تشغيل السيرفر ثم جرّب:
+TOKEN=$(curl -s -X POST localhost:3000/api/admin/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin123"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['token'])")
+curl -X POST localhost:3000/api/admin/telegram/test -H "Authorization: Bearer $TOKEN"
+
+# 5) إعادة إرسال إشعار طلب فشل (اختياري force):
+curl -X POST localhost:3000/api/admin/orders/BS-20260907-0001/telegram/retry \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{}'
+```
+
+> تغيير البوت لاحقًا = تغيير سطرين في `.env` فقط — بدون أي تعديل في الواجهة.
+
+## 7. رحلة المستخدم الكاملة
 
 الرئيسية ← المنتجات (بحث/فلتر/ترتيب) ← التفاصيل ← السلة ←
 إتمام الطلب (توصيل/استلام + مراجعة) ← `POST /api/orders` ← حفظ في SQLite ←
@@ -119,14 +155,14 @@ curl "localhost:3000/api/admin/orders" -H "Authorization: Bearer $TOKEN"
 > الواجهة تكتشف السيرفر تلقائيًا (`mode: "auto"` في `frontend/js/config.js`) —
 > لو السيرفر مطفي تعمل بوضع Demo محلي، ولو شغال تستخدمه كمصدر أساسي.
 
-## 7. قواعد الأمان المطبقة
+## 8. قواعد الأمان المطبقة
 
 - الأسعار والإجماليات تُحسب في السيرفر فقط (مقاومة للتلاعب) داخل Transaction.
 - كلمات المرور مشفَّرة (bcrypt) ولا تُعرض عبر أي API.
 - لا Bot Token ولا أسرار في الواجهة أو الـ Git — فقط `backend/.env` (مستبعد).
 - التحقق من التوفر والمخزون والهاتف المصري (11 رقمًا) في السيرفر.
 
-## 8. الإيقاف والتشغيل
+## 9. الإيقاف والتشغيل
 
 - الإيقاف: `Ctrl+C` في نافذة السيرفر.
 - التشغيل مجددًا: `cd backend && npm run dev` (البيانات محفوظة في `data/`).
@@ -136,5 +172,5 @@ curl "localhost:3000/api/admin/orders" -H "Authorization: Bearer $TOKEN"
 
 - [x] المراحل 1–3: الواجهة كاملة
 - [x] المرحلة 4: Backend محلي + SQLite + REST API ✅ (أنت هنا)
-- [ ] المرحلة 5: ربط Telegram Bot الحقيقي (البنية جاهزة في `telegram.service.js`)
+- [x] المرحلة 5: Telegram Bot للإشعارات (يُفعَّل بمتغيرين في `.env` فقط)
 - [ ] لاحقًا: نقل أونلاين + لوحة إدارة + دفع

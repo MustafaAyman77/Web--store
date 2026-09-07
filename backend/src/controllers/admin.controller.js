@@ -7,6 +7,7 @@ import { getDb } from "../database/database.js";
 import { ApiError } from "../utils/api-error.js";
 import { createSession } from "../middleware/auth.middleware.js";
 import { listOrders, updateOrderStatus, ORDER_STATUSES } from "../services/order.service.js";
+import { testTelegramConnection, retryTelegramNotification } from "../services/telegram.service.js";
 
 export async function login(req, res) {
   const username = String(req.body?.username || "").trim();
@@ -36,5 +37,16 @@ export function orders(req, res) {
 
 export function setOrderStatus(req, res) {
   const result = updateOrderStatus(req.params.ref, String(req.body?.status || ""));
+  res.json({ success: true, data: result });
+}
+
+export async function telegramTest(req, res) {
+  const result = await testTelegramConnection();
+  res.json({ success: true, data: result });
+}
+
+export async function telegramRetry(req, res) {
+  const force = req.body?.force === true;
+  const result = await retryTelegramNotification(req.params.ref, { force });
   res.json({ success: true, data: result });
 }

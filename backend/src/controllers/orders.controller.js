@@ -3,8 +3,8 @@
 // ==========================================================================
 import { createOrder, getOrderByIdOrNumber } from "../services/order.service.js";
 
-export function create(req, res) {
-  const result = createOrder(req.body || {});
+export async function create(req, res) {
+  const result = await createOrder(req.body || {});
   res.status(201).json({ success: true, data: result });
 }
 

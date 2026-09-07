@@ -4,7 +4,7 @@
    - createOrderPayload(): تجهيز Order Object محليًا (للعرض والمراجعة).
    - submitOrder(): الإرسال الحقيقي عبر Basit.Api → POST /api/orders عند توفر
      السيرفر (الأسعار تُحسب هناك)، أو حفظ Demo محلي عند غيابه.
-   🔮 التدفق المستقبلي: Website → Backend API → Validate → Save → Telegram.
+   🔮 التدفق المستقبلي: Website → Backend API → Validate → Save → Notify.
    ========================================================================== */
 (function (global) {
   "use strict";

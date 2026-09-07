@@ -79,7 +79,7 @@ function validatePayload(body) {
 
 /* ================= إنشاء الطلب ================= */
 
-export function createOrder(body) {
+export async function createOrder(body) {
   const input = validatePayload(body);
 
   const result = transaction((db) => {
@@ -123,9 +123,9 @@ export function createOrder(body) {
     const orderNumber = generateOrderNumber(db);
     db.prepare(
       `INSERT INTO orders
-       (id, order_number, customer_id, subtotal, delivery_fee, total, fulfillment_method, notes, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new');`
-    ).run(orderId, orderNumber, customer.id, subtotal, deliveryFee, total, input.fulfillmentMethod, input.notes);
+       (id, order_number, customer_id, subtotal, delivery_fee, total, fulfillment_method, notes, status, telegram_status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', ?);`
+    ).run(orderId, orderNumber, customer.id, subtotal, deliveryFee, total, input.fulfillmentMethod, input.notes, env.telegram.enabled ? "pending" : "disabled");
 
     const insertItem = db.prepare(
       "INSERT INTO order_items (id, order_id, product_id, product_name, quantity, price, subtotal) VALUES (?, ?, ?, ?, ?, ?, ?);"
@@ -149,10 +149,16 @@ export function createOrder(body) {
     };
   });
 
-  // 4) إشعار Telegram (معطّل في هذه المرحلة — لا يُفشل الطلب أبدًا)
-  sendOrderNotification({ orderNumber: result.orderNumber, total: result.total }).catch(() => {});
+  // 4) إشعار Telegram — بعد نجاح الحفظ فقط، ولا يُفشل الطلب أبدًا
+  let telegramStatus = "disabled";
+  try {
+    const tg = await sendOrderNotification(result.orderId);
+    telegramStatus = tg.sent ? "sent" : (tg.reason === "disabled" ? "disabled" : "failed");
+  } catch {
+    telegramStatus = "failed";
+  }
 
-  return result;
+  return { ...result, telegramStatus };
 }
 
 /* ================= قراءة وتحديث ================= */
@@ -168,6 +174,7 @@ export function getOrderByIdOrNumber(ref) {
     orderId: order.id,
     orderNumber: order.order_number,
     status: order.status,
+    telegramStatus: order.telegram_status || "pending",
     subtotal: order.subtotal,
     deliveryFee: order.delivery_fee,
     total: order.total,
@@ -186,6 +193,7 @@ export function listOrders({ status, limit = 20, offset = 0 } = {}) {
   const rows = db.prepare(
     `SELECT o.id, o.order_number AS orderNumber, o.status, o.subtotal, o.delivery_fee AS deliveryFee,
             o.total, o.fulfillment_method AS fulfillmentMethod, o.created_at AS createdAt,
+            o.telegram_status AS telegramStatus,
             c.name AS customerName, c.phone AS customerPhone,
             (SELECT COUNT(*) FROM order_items WHERE order_id = o.id) AS linesCount
      FROM orders o JOIN customers c ON c.id = o.customer_id

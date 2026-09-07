@@ -30,7 +30,23 @@ export function getDb() {
   const schemaPath = path.join(__dirname, "schema.sql");
   const schema = fs.readFileSync(schemaPath, "utf8");
   db.exec(schema);
+  migrate(db);
   return db;
+}
+
+/** ترحيلات خفيفة لقواعد البيانات الموجودة (آمنة للتكرار) */
+function migrate(database) {
+  const cols = database.prepare("PRAGMA table_info(orders);").all().map((c) => c.name);
+  const ensure = (name, ddl) => {
+    if (!cols.includes(name)) database.exec(`ALTER TABLE orders ADD COLUMN ${ddl};`);
+  };
+  ensure("telegram_status", "telegram_status TEXT NOT NULL DEFAULT 'pending'");
+  ensure("telegram_message_id", "telegram_message_id INTEGER");
+  ensure("telegram_sent_at", "telegram_sent_at TEXT");
+  ensure("telegram_error", "telegram_error TEXT");
+  // طلبات قديمة قبل نظام Telegram → معطّلة، وأي إرسال متقطع → فاشل
+  database.exec("UPDATE orders SET telegram_status = 'disabled' WHERE telegram_status = 'pending';");
+  database.exec("UPDATE orders SET telegram_status = 'failed', telegram_error = 'interrupted: server restarted during send' WHERE telegram_status = 'sending';");
 }
 
 /** تنفيذ دالة داخل Transaction — أي خطأ = Rollback تلقائي */

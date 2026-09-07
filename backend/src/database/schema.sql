@@ -47,6 +47,10 @@ CREATE TABLE IF NOT EXISTS orders (
   fulfillment_method TEXT NOT NULL,          -- delivery | pickup
   notes            TEXT DEFAULT '',
   status           TEXT NOT NULL DEFAULT 'new',
+  telegram_status  TEXT NOT NULL DEFAULT 'pending', -- pending|sending|sent|failed|disabled
+  telegram_message_id INTEGER,
+  telegram_sent_at TEXT,
+  telegram_error   TEXT,
   created_at       TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
