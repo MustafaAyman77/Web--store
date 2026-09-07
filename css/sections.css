@@ -1,0 +1,196 @@
+/* ==========================================================================
+   أسواق البسيط — Sections: أقسام الصفحة الرئيسية
+   ========================================================================== */
+
+.section { padding-block: 2.6rem; }
+.section-tint { background: var(--bg-tint); }
+@media (min-width: 768px) { .section { padding-block: 3.6rem; } }
+
+/* ---------------- Hero ---------------- */
+.hero {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(150deg, var(--brand-900) 0%, var(--brand-700) 55%, var(--brand-600) 100%);
+  color: #fff;
+  padding-block: 2.8rem 3.4rem;
+}
+.hero::before, .hero::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.07);
+  pointer-events: none;
+}
+.hero::before { width: 340px; height: 340px; top: -140px; inset-inline-start: -120px; }
+.hero::after { width: 220px; height: 220px; bottom: -110px; inset-inline-end: 8%; }
+
+.hero-grid {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 2rem;
+  align-items: center;
+}
+@media (min-width: 900px) {
+  .hero { padding-block: 4rem 4.5rem; }
+  .hero-grid { grid-template-columns: 1.05fr 0.95fr; gap: 3rem; }
+}
+
+.hero-copy .badge-open { margin-bottom: 1rem; }
+.hero-title { font-size: clamp(2rem, 8vw, 3.2rem); font-weight: 900; line-height: 1.35; }
+.hero-title .hl { color: #fef08a; }
+.hero-sub { font-size: clamp(1.05rem, 4vw, 1.3rem); font-weight: 800; margin-top: 0.5rem; color: #e9f7ec; }
+.hero-desc { margin-top: 0.6rem; color: rgb(255 255 255 / 0.85); max-width: 46ch; font-size: 0.98rem; }
+.hero-cta { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.4rem; }
+.hero-cta .btn { flex: 1 1 auto; }
+@media (min-width: 480px) { .hero-cta .btn { flex: 0 1 auto; } }
+.hero-points { display: flex; flex-wrap: wrap; gap: 0.5rem 1.2rem; margin-top: 1.3rem; font-size: 0.88rem; font-weight: 700; color: #d9efe0; }
+.hero-points i { font-style: normal; display: inline-grid; place-items: center; width: 20px; height: 20px; margin-inline-end: 0.3rem; background: rgb(255 255 255 / 0.18); border-radius: 50%; font-size: 0.7rem; }
+
+/* رسم المحل (CSS Illustration) */
+.hero-visual { position: relative; display: flex; justify-content: center; }
+
+.store-card {
+  width: min(340px, 88vw);
+  background: #fff;
+  border-radius: 22px;
+  padding: 0 0 1.1rem;
+  box-shadow: 0 30px 60px -20px rgb(0 0 0 / 0.45);
+  overflow: hidden;
+  position: relative;
+  animation: floaty 5s ease-in-out infinite;
+}
+@keyframes floaty { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+
+.awning { display: flex; height: 44px; }
+.awning i { flex: 1; }
+.awning i:nth-child(odd) { background: var(--accent-500); }
+.awning i:nth-child(even) { background: #fff; }
+.store-sign {
+  text-align: center;
+  font-weight: 900;
+  font-size: 1.25rem;
+  color: var(--brand-800);
+  background: var(--brand-50);
+  border-block: 3px solid var(--brand-600);
+  padding: 0.35rem;
+}
+.store-body { display: grid; grid-template-columns: 1fr 0.8fr 1fr; gap: 0.5rem; padding: 0.9rem 0.9rem 0; }
+.store-window {
+  background: linear-gradient(160deg, #e0f2fe, #f0fdf4);
+  border: 2px solid var(--brand-100);
+  border-radius: 12px;
+  min-height: 92px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 1.35rem;
+}
+.store-door {
+  background: var(--brand-700);
+  border-radius: 12px 12px 4px 4px;
+  min-height: 92px;
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+.store-door i { width: 34px; height: 46px; background: rgb(255 255 255 / 0.25); border-radius: 8px; border: 2px solid rgb(255 255 255 / 0.5); }
+.store-step { height: 10px; margin: 0.7rem 1.4rem 0; background: var(--brand-100); border-radius: var(--radius-pill); }
+
+.float-chip {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: #fff;
+  color: var(--ink);
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 0.55rem 0.95rem;
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-lg);
+  white-space: nowrap;
+}
+.float-chip span { font-size: 1.1rem; }
+.chip-1 { top: 6%; inset-inline-start: 0; animation: floaty 4s ease-in-out infinite; }
+.chip-2 { bottom: 22%; inset-inline-end: -2%; animation: floaty 4.6s 0.6s ease-in-out infinite; }
+.chip-3 { bottom: 2%; inset-inline-start: 6%; animation: floaty 5.2s 1s ease-in-out infinite; }
+@media (max-width: 380px) { .chip-2 { inset-inline-end: 0; } }
+
+/* ---------------- Quick info ---------------- */
+.quick-info { margin-top: -1.6rem; position: relative; z-index: 2; }
+.qi-grid { display: grid; gap: 0.7rem; }
+@media (min-width: 768px) { .qi-grid { grid-template-columns: repeat(3, 1fr); gap: 1.1rem; } }
+.qi-card {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  background: var(--card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md);
+  padding: 0.9rem 1.1rem;
+  box-shadow: var(--shadow-md);
+}
+.qi-icon {
+  width: 50px; height: 50px; flex: 0 0 auto;
+  display: grid; place-items: center;
+  font-size: 1.5rem;
+  background: var(--brand-50);
+  border-radius: 14px;
+}
+.qi-card strong { display: block; font-size: 0.95rem; }
+.qi-card small { color: var(--muted); font-size: 0.78rem; }
+
+/* ---------------- Offers section ---------------- */
+.offers-section {
+  background: linear-gradient(160deg, #3b1d08 0%, #7c2d12 45%, #c2410c 100%);
+  position: relative;
+  overflow: hidden;
+}
+.offers-section::before {
+  content: "🔥🔥🔥";
+  position: absolute;
+  top: 0.6rem;
+  inset-inline-end: 1rem;
+  font-size: 2.4rem;
+  opacity: 0.18;
+  letter-spacing: 0.5rem;
+}
+
+/* ---------------- Location ---------------- */
+.location-grid { display: grid; gap: 1rem; }
+@media (min-width: 768px) { .location-grid { grid-template-columns: 1fr 1.2fr; gap: 1.4rem; } }
+
+.location-card {
+  background: var(--card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  box-shadow: var(--shadow-sm);
+}
+.location-card h3 { font-size: 1.2rem; color: var(--brand-800); margin-bottom: 0.8rem; }
+.location-list { display: grid; gap: 0.55rem; margin-bottom: 1.1rem; }
+.location-list li { display: flex; align-items: center; gap: 0.6rem; font-weight: 700; font-size: 0.95rem; }
+.location-card .badge-open { background: var(--brand-50); color: var(--brand-700); border-color: var(--brand-200); }
+
+.map-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  text-align: center;
+  min-height: 260px;
+  background:
+    repeating-linear-gradient(45deg, #f1f5f1 0 14px, #e8efe8 14px 28px);
+  border: 2px dashed var(--brand-300);
+  border-radius: var(--radius-lg);
+  padding: 2rem 1.5rem;
+  color: var(--muted);
+}
+.map-pin { font-size: 2.6rem; animation: pinBounce 2s ease-in-out infinite; }
+@keyframes pinBounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+.map-placeholder strong { color: var(--brand-800); font-size: 1.1rem; }
+.map-placeholder p { font-size: 0.88rem; }
