@@ -10,8 +10,12 @@ import { listOrders, updateOrderStatus, ORDER_STATUSES } from "../services/order
 import { testTelegramConnection, retryTelegramNotification } from "../services/telegram.service.js";
 import {
   getDashboard, getAdminOrderDetails, listCustomers, getCustomerDetails,
-  listProductsAdmin, createProduct, updateProduct, softDeleteProduct,
+  listProductsAdmin, createProduct, updateProduct, softDeleteProduct, bulkUpdateProducts,
 } from "../services/admin.service.js";
+import { listAdminCategories, createCategory, updateCategory } from "../services/category.service.js";
+import {
+  getInventorySummary, getInventoryProduct, getInventoryHistory, adjustStock,
+} from "../services/inventory.service.js";
 import { allowedNext } from "../services/order.service.js";
 import { logAudit } from "../utils/audit.js";
 
@@ -44,7 +48,7 @@ export function orders(req, res) {
 }
 
 export function setOrderStatus(req, res) {
-  const result = updateOrderStatus(req.params.ref, String(req.body?.status || ""));
+  const result = updateOrderStatus(req.params.ref, String(req.body?.status || ""), req.admin?.username);
   if (!result.unchanged) {
     logAudit({ actor: req.admin?.username, action: "order.status", entity: "order", entityId: result.orderNumber, meta: { from: result.prevStatus, to: result.status } });
   }
@@ -77,13 +81,63 @@ export function orderDetails(req, res) {
 }
 
 export function productsList(req, res) {
-  const { search, category, available, page, limit } = req.query;
+  const { search, category, available, status, sort, page, limit } = req.query;
   res.json({
     success: true,
     data: listProductsAdmin({
       search: search ? String(search) : undefined,
       category: category ? String(category) : undefined,
       available: available === undefined ? undefined : available,
+      status: status ? String(status) : undefined,
+      sort: sort ? String(sort) : undefined,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    }),
+  });
+}
+
+export function productsBulk(req, res) {
+  const result = bulkUpdateProducts(req.body?.ids, req.body?.action, req.admin?.username);
+  res.json({ success: true, data: result });
+}
+
+export function categoriesList(req, res) {
+  res.json({ success: true, data: { categories: listAdminCategories() } });
+}
+
+export function categoryCreate(req, res) {
+  const category = createCategory(req.body || {}, req.admin?.username);
+  res.status(201).json({ success: true, data: category });
+}
+
+export function categoryUpdate(req, res) {
+  const category = updateCategory(req.params.id, req.body || {}, req.admin?.username);
+  res.json({ success: true, data: category });
+}
+
+export function inventorySummary(req, res) {
+  res.json({ success: true, data: getInventorySummary() });
+}
+
+export function inventoryProduct(req, res) {
+  res.json({ success: true, data: getInventoryProduct(req.params.productId) });
+}
+
+export function inventoryAdjust(req, res) {
+  const result = adjustStock(req.params.productId, {
+    mode: req.body?.mode,
+    quantity: req.body?.quantity,
+    reason: req.body?.reason,
+    admin: req.admin?.username,
+  });
+  res.json({ success: true, data: result });
+}
+
+export function inventoryHistory(req, res) {
+  const { page, limit } = req.query;
+  res.json({
+    success: true,
+    data: getInventoryHistory(req.params.productId, {
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
     }),

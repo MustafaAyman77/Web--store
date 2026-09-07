@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS products (
   featured       INTEGER NOT NULL DEFAULT 0,
   offer          INTEGER NOT NULL DEFAULT 0, -- 1 = عليه عرض/خصم
   stock_quantity INTEGER,                    -- NULL = بدون تتبع مخزون
+  low_stock_threshold INTEGER NOT NULL DEFAULT 5, -- إذا وصل المخزون لهذا الحد أو أقل = منخفض
+  stock_tracking INTEGER NOT NULL DEFAULT 1, -- 0/1 هل يُتتبع مخزون هذا المنتج؟
   popularity     INTEGER NOT NULL DEFAULT 50,
   created_at     TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at     TEXT NOT NULL DEFAULT (datetime('now'))
@@ -51,6 +53,8 @@ CREATE TABLE IF NOT EXISTS orders (
   telegram_message_id INTEGER,
   telegram_sent_at TEXT,
   telegram_error   TEXT,
+  stock_deducted INTEGER NOT NULL DEFAULT 0, -- 1 = خُصم المخزون عند إنشاء الطلب
+  stock_restored INTEGER NOT NULL DEFAULT 0, -- 1 = أُعيد المخزون بعد الإلغاء (مرة واحدة فقط)
   created_at       TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -87,3 +91,28 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   created_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_logs(entity, entity_id);
+
+CREATE TABLE IF NOT EXISTS categories (
+  id         TEXT PRIMARY KEY,               -- slug ثابت: beverages, snacks, ...
+  name       TEXT NOT NULL,                  -- الاسم العربي
+  slug       TEXT NOT NULL UNIQUE,
+  image      TEXT DEFAULT '',                -- أيقونة/مسار صورة القسم
+  active     INTEGER NOT NULL DEFAULT 1,     -- 0/1
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS inventory_movements (
+  id               TEXT PRIMARY KEY,         -- UUID
+  product_id       TEXT NOT NULL REFERENCES products(id),
+  type             TEXT NOT NULL,            -- purchase|sale|manual_add|manual_remove|correction|cancel_restore
+  quantity         INTEGER NOT NULL,         -- الكمية (موجبة دائمًا)
+  previous_quantity INTEGER NOT NULL,
+  new_quantity     INTEGER NOT NULL,
+  reason           TEXT DEFAULT '',
+  admin_username   TEXT DEFAULT '',
+  created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_movements_product ON inventory_movements(product_id);
+CREATE INDEX IF NOT EXISTS idx_movements_created ON inventory_movements(created_at);

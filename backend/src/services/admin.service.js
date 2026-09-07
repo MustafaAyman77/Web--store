@@ -7,11 +7,7 @@ import { ApiError } from "../utils/api-error.js";
 import { logAudit } from "../utils/audit.js";
 import { toPublicProduct } from "../controllers/products.controller.js";
 import { allowedNext, ORDER_STATUSES, getOrderByIdOrNumber } from "./order.service.js";
-
-const PRODUCT_CATEGORIES = [
-  "beverages", "snacks", "dairy", "grocery",
-  "cleaning", "care", "frozen", "home", "offers",
-];
+import { categoryExists } from "./category.service.js";
 
 /* ================= نطاق "اليوم" بتوقيت القاهرة ================= */
 
@@ -55,13 +51,17 @@ export function getDashboard() {
 
   const lowStock = db
     .prepare(
-      `SELECT id, name, stock_quantity AS stock, available FROM products
-       WHERE stock_quantity IS NOT NULL AND stock_quantity <= 5
+      `SELECT id, name, category, image, stock_quantity AS stock,
+              low_stock_threshold AS threshold, available FROM products
+       WHERE stock_tracking = 1 AND stock_quantity > 0 AND stock_quantity <= low_stock_threshold
        ORDER BY stock_quantity ASC LIMIT 8;`
     )
     .all();
+  const lowCount = db
+    .prepare("SELECT COUNT(*) AS n FROM products WHERE stock_tracking = 1 AND stock_quantity > 0 AND stock_quantity <= low_stock_threshold;")
+    .get();
   const outRow = db
-    .prepare("SELECT COUNT(*) AS n FROM products WHERE available = 1 AND stock_quantity IS NOT NULL AND stock_quantity <= 0;")
+    .prepare("SELECT COUNT(*) AS n FROM products WHERE stock_tracking = 1 AND stock_quantity IS NOT NULL AND stock_quantity <= 0;")
     .get();
 
   return {
@@ -75,7 +75,9 @@ export function getDashboard() {
     todayOrders: t.n || 0,
     todayRevenue: t.rev || 0,
     lowStock,
+    lowStockCount: lowCount.n || 0,
     outOfStockCount: outRow.n || 0,
+    restockCount: (lowCount.n || 0) + (outRow.n || 0),
   };
 }
 
@@ -151,7 +153,16 @@ export function getCustomerDetails(id) {
 
 /* ================= المنتجات (للإدارة) ================= */
 
-export function listProductsAdmin({ search, category, available, page, limit } = {}) {
+const ADMIN_SORTS = {
+  newest: "rowid DESC",
+  oldest: "rowid ASC",
+  price_asc: "price ASC, name ASC",
+  price_desc: "price DESC, name ASC",
+  stock_desc: "CASE WHEN stock_quantity IS NULL THEN 1 ELSE 0 END, stock_quantity DESC",
+  stock_asc: "CASE WHEN stock_quantity IS NULL THEN 1 ELSE 0 END, stock_quantity ASC",
+};
+
+export function listProductsAdmin({ search, category, available, status, sort, page, limit } = {}) {
   const { limit: lim, offset, page: p } = paginate(page, limit);
   const db = getDb();
   const conds = [];
@@ -159,14 +170,21 @@ export function listProductsAdmin({ search, category, available, page, limit } =
   if (category) { conds.push("category = ?"); vals.push(String(category)); }
   if (available === true || available === "1" || available === "true") conds.push("available = 1");
   if (available === false || available === "0" || available === "false") conds.push("available = 0");
+  if (status === "available") conds.push("available = 1");
+  else if (status === "unavailable") conds.push("available = 0");
+  else if (status === "out_of_stock") conds.push("stock_tracking = 1 AND stock_quantity IS NOT NULL AND stock_quantity <= 0");
+  else if (status === "low_stock") conds.push("stock_tracking = 1 AND stock_quantity > 0 AND stock_quantity <= low_stock_threshold");
+  else if (status === "offer") conds.push("offer = 1");
+  else if (status === "featured") conds.push("featured = 1");
   if (search) {
-    conds.push("(name LIKE ? OR description LIKE ? OR id LIKE ?)");
+    conds.push("(name LIKE ? OR description LIKE ? OR category LIKE ? OR id LIKE ?)");
     const like = `%${String(search).slice(0, 60)}%`;
-    vals.push(like, like, like);
+    vals.push(like, like, like, like);
   }
+  const orderBy = ADMIN_SORTS[sort] || "popularity DESC, name ASC";
   const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
   const rows = db
-    .prepare(`SELECT * FROM products ${where} ORDER BY popularity DESC, name ASC LIMIT ? OFFSET ?;`)
+    .prepare(`SELECT * FROM products ${where} ORDER BY ${orderBy} LIMIT ? OFFSET ?;`)
     .all(...vals, lim, offset);
   const totalRow = db.prepare(`SELECT COUNT(*) AS count FROM products ${where};`).get(...vals);
   return { products: rows.map(toPublicProduct), total: totalRow.count, limit: lim, offset, page: p };
@@ -188,14 +206,14 @@ function validateProductInput(body, isNew) {
     out.name = name;
   }
   if (isNew || b.category !== undefined) {
-    const category = cleanStr(b.category, 30);
-    if (!PRODUCT_CATEGORIES.includes(category)) throw ApiError.badRequest("INVALID_CATEGORY", "القسم غير صحيح.");
+    const category = cleanStr(b.category, 40);
+    if (!category || !categoryExists(category)) throw ApiError.badRequest("INVALID_CATEGORY", "القسم غير صحيح.");
     out.category = category;
   }
   if (b.description !== undefined) out.description = cleanStr(b.description, 500);
   if (isNew || b.price !== undefined) {
     const price = cleanNum(b.price);
-    if (!Number.isFinite(price) || price <= 0) throw ApiError.badRequest("INVALID_PRICE", "السعر يجب أن يكون رقمًا أكبر من صفر.");
+    if (!Number.isFinite(price) || price < 0) throw ApiError.badRequest("INVALID_PRICE", "السعر يجب أن يكون رقمًا ≥ صفر.");
     out.price = Math.round(price * 100) / 100;
   }
   if (b.oldPrice !== undefined) {
@@ -207,7 +225,7 @@ function validateProductInput(body, isNew) {
     }
   }
   if (b.unit !== undefined) out.unit = cleanStr(b.unit, 20);
-  if (b.image !== undefined) out.image = cleanStr(b.image, 20);
+  if (b.image !== undefined) out.image = cleanStr(b.image, 300);
   if (b.tint !== undefined) {
     if (!Array.isArray(b.tint) || b.tint.length !== 2) throw ApiError.badRequest("INVALID_TINT", "ألوان العرض غير صحيحة.");
     out.tint = JSON.stringify([cleanStr(b.tint[0], 20), cleanStr(b.tint[1], 20)]);
@@ -230,6 +248,12 @@ function validateProductInput(body, isNew) {
       out.stock_quantity = s;
     }
   }
+  if (b.lowStockThreshold !== undefined) {
+    const t = cleanNum(b.lowStockThreshold);
+    if (!Number.isInteger(t) || t < 0) throw ApiError.badRequest("INVALID_THRESHOLD", "حد المخزون المنخفض يجب أن يكون رقمًا صحيحًا ≥ صفر.");
+    out.low_stock_threshold = t;
+  }
+  if (b.stockTracking !== undefined) out.stock_tracking = toBit(b.stockTracking);
   if (b.popularity !== undefined) {
     const pop = cleanNum(b.popularity);
     if (!Number.isFinite(pop)) throw ApiError.badRequest("INVALID_POPULARITY", "الشعبية غير صحيحة.");
@@ -255,6 +279,12 @@ function nextProductId(db) {
   return candidate;
 }
 
+function assertOldPriceOk(oldPrice, price) {
+  if (oldPrice !== null && oldPrice !== undefined && Number(oldPrice) < Number(price)) {
+    throw ApiError.badRequest("INVALID_OLD_PRICE", "السعر القديم يجب أن يكون أكبر من أو يساوي السعر الحالي.");
+  }
+}
+
 function refreshOfferFlag(row) {
   // offer = شارة offer أو سعر قديم أعلى من الحالي
   return row.badge_tone === "offer" || (row.old_price !== null && Number(row.old_price) > Number(row.price)) ? 1 : 0;
@@ -262,18 +292,23 @@ function refreshOfferFlag(row) {
 
 export function createProduct(body, actor) {
   const data = validateProductInput(body, true);
+  assertOldPriceOk(data.old_price ?? null, data.price);
   const db = getDb();
   const id = nextProductId(db);
+  const stockQty = data.stock_quantity ?? null;
+  const tracking = data.stock_tracking ?? (stockQty === null ? 0 : 1);
   db.prepare(
     `INSERT INTO products
      (id, name, category, description, price, old_price, unit, image, tint,
-      badge_text, badge_tone, available, featured, offer, stock_quantity, popularity)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`
+      badge_text, badge_tone, available, featured, offer, stock_quantity,
+      stock_tracking, low_stock_threshold, popularity)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`
   ).run(
     id, data.name, data.category, data.description ?? "", data.price, data.old_price ?? null,
     data.unit ?? "", data.image ?? "🛒", data.tint ?? JSON.stringify(["#f1f5f9", "#e2e8f0"]),
     data.badge_text ?? "", data.badge_tone ?? "", data.available ?? 1,
-    data.featured ?? 0, data.offer ?? 0, data.stock_quantity ?? null, data.popularity ?? 50
+    data.featured ?? 0, data.offer ?? 0, stockQty,
+    tracking, data.low_stock_threshold ?? 5, data.popularity ?? 50
   );
   const row = db.prepare("SELECT * FROM products WHERE id = ?;").get(id);
   db.prepare("UPDATE products SET offer = ? WHERE id = ?;").run(refreshOfferFlag(row) || (data.offer ? 1 : 0), id);
@@ -286,6 +321,11 @@ export function updateProduct(id, body, actor) {
   const existing = db.prepare("SELECT * FROM products WHERE id = ?;").get(id);
   if (!existing) throw ApiError.notFound("PRODUCT_NOT_FOUND", "المنتج غير موجود.");
   const data = validateProductInput(body, false);
+  // مخزون null بدون تحديد التتبع = إيقاف التتبع تلقائيًا
+  if (data.stock_quantity === null && data.stock_tracking === undefined) data.stock_tracking = 0;
+  const effPrice = data.price ?? Number(existing.price);
+  const effOld = (data.old_price !== undefined ? data.old_price : existing.old_price);
+  assertOldPriceOk(effOld, effPrice);
   const keys = Object.keys(data);
   if (keys.length) {
     const set = keys.map((k) => `${k} = ?`).join(", ");
@@ -294,8 +334,40 @@ export function updateProduct(id, body, actor) {
   }
   const row = db.prepare("SELECT * FROM products WHERE id = ?;").get(id);
   db.prepare("UPDATE products SET offer = ? WHERE id = ?;").run(refreshOfferFlag(row) || (data.offer ? 1 : 0), id);
-  logAudit({ actor, action: "product.update", entity: "product", entityId: id, meta: { changes: keys } });
+  const values = {};
+  if (data.price !== undefined && Number(existing.price) !== Number(data.price)) {
+    values.price = { from: Number(existing.price), to: Number(data.price) };
+  }
+  if (data.old_price !== undefined && (existing.old_price ?? null) !== (data.old_price ?? null)) {
+    values.oldPrice = { from: existing.old_price, to: data.old_price };
+  }
+  if (data.stock_quantity !== undefined && (existing.stock_quantity ?? null) !== (data.stock_quantity ?? null)) {
+    values.stock = { from: existing.stock_quantity, to: data.stock_quantity };
+  }
+  if (data.available !== undefined && Number(existing.available) !== Number(data.available)) {
+    values.available = { from: Number(existing.available) === 1, to: Number(data.available) === 1 };
+  }
+  logAudit({ actor, action: "product.update", entity: "product", entityId: id, meta: { changes: keys, values } });
   return toPublicProduct(db.prepare("SELECT * FROM products WHERE id = ?;").get(id));
+}
+
+/** عمليات جماعية آمنة: تفعيل/تعطيل فقط في هذه المرحلة */
+export function bulkUpdateProducts(ids, action, actor) {
+  if (!Array.isArray(ids) || !ids.length || ids.length > 100) {
+    throw ApiError.badRequest("INVALID_IDS", "حدد منتجًا واحدًا على الأقل (بحد أقصى 100).");
+  }
+  const to = action === "activate" ? 1 : action === "deactivate" ? 0 : null;
+  if (to === null) throw ApiError.badRequest("INVALID_ACTION", "الإجراء غير صحيح.");
+  const db = getDb();
+  const placeholders = ids.map(() => "?").join(",");
+  const info = db.prepare(
+    `UPDATE products SET available = ?, updated_at = datetime('now') WHERE id IN (${placeholders});`
+  ).run(to, ...ids.map((v) => String(v).slice(0, 40)));
+  logAudit({
+    actor, action: to ? "product.bulk_activate" : "product.bulk_deactivate",
+    entity: "product", entityId: `${info.changes} items`, meta: { count: info.changes },
+  });
+  return { updated: info.changes };
 }
 
 /** حذف ناعم: إيقاف التوفر فقط — الطلبات القديمة لا تتأثر */

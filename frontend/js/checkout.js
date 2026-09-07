@@ -283,7 +283,7 @@
           applyDeliveryAvailability(false);
         } else if (code === "PRODUCT_UNAVAILABLE" || code === "INSUFFICIENT_STOCK" ||
                    code === "PRODUCT_NOT_FOUND" || code === "INVALID_PRICE") {
-          showFormError("أحد المنتجات في طلبك لم يعد متوفرًا.");
+          showFormError((res && res.error) || "أحد المنتجات في طلبك لم يعد متوفرًا.");
           renderSummary();
           renderReview();
         } else if (code === "NETWORK_ERROR") {

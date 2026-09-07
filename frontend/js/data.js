@@ -179,6 +179,10 @@
         PRODUCTS.length = 0;
         data.products.forEach((p) => { if (p && p.id) PRODUCTS.push(p); });
       }
+      if (data && Array.isArray(data.categories) && data.categories.length) {
+        CATEGORIES.length = 0;
+        data.categories.forEach((c) => { if (c && c.id) CATEGORIES.push(c); });
+      }
     },
   };
 

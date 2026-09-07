@@ -3,7 +3,9 @@ import { asyncHandler } from "../utils/async-handler.js";
 import { requireAdmin } from "../middleware/auth.middleware.js";
 import {
   login, logout, dashboard, orders, orderDetails, setOrderStatus, telegramTest, telegramRetry,
-  productsList, productCreate, productUpdate, productDelete, customersList, customerDetails,
+  productsList, productCreate, productUpdate, productDelete, productsBulk, customersList, customerDetails,
+  categoriesList, categoryCreate, categoryUpdate,
+  inventorySummary, inventoryProduct, inventoryAdjust, inventoryHistory,
 } from "../controllers/admin.controller.js";
 
 const router = Router();
@@ -14,7 +16,15 @@ router.get("/dashboard", requireAdmin, asyncHandler(dashboard));
 router.get("/orders/:ref", requireAdmin, asyncHandler(orderDetails));
 router.get("/products", requireAdmin, asyncHandler(productsList));
 router.post("/products", requireAdmin, asyncHandler(productCreate));
+router.patch("/products/bulk", requireAdmin, asyncHandler(productsBulk));
 router.patch("/products/:id", requireAdmin, asyncHandler(productUpdate));
+router.get("/categories", requireAdmin, asyncHandler(categoriesList));
+router.post("/categories", requireAdmin, asyncHandler(categoryCreate));
+router.patch("/categories/:id", requireAdmin, asyncHandler(categoryUpdate));
+router.get("/inventory", requireAdmin, asyncHandler(inventorySummary));
+router.get("/inventory/:productId", requireAdmin, asyncHandler(inventoryProduct));
+router.post("/inventory/:productId/adjust", requireAdmin, asyncHandler(inventoryAdjust));
+router.get("/inventory/:productId/history", requireAdmin, asyncHandler(inventoryHistory));
 router.delete("/products/:id", requireAdmin, asyncHandler(productDelete));
 router.get("/customers", requireAdmin, asyncHandler(customersList));
 router.get("/customers/:id", requireAdmin, asyncHandler(customerDetails));

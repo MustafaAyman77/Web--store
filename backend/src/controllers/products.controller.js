@@ -3,6 +3,7 @@
 // ==========================================================================
 import { getDb } from "../database/database.js";
 import { ApiError } from "../utils/api-error.js";
+import { stockStatusOf, discountPercent, isPurchasable, adminStatusOf } from "../utils/product-status.js";
 
 /** تطبيع النص العربي للبحث (نفس منطق الواجهة) */
 function normalizeAr(str) {
@@ -33,7 +34,15 @@ export function toPublicProduct(row) {
     featured: Number(row.featured) === 1,
     offer: Number(row.offer) === 1,
     stockQuantity: row.stock_quantity,
+    stockTracking: Number(row.stock_tracking ?? 1) === 1,
+    lowStockThreshold: Number(row.low_stock_threshold ?? 5),
+    stockStatus: stockStatusOf(row),
+    purchasable: isPurchasable(row),
+    status: adminStatusOf(row),
+    discountPercent: discountPercent(row.price, row.old_price),
     popularity: Number(row.popularity) || 0,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 

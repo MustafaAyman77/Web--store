@@ -66,7 +66,9 @@
       unit: p.unit || "",
       icon: p.image || "🛒",
       tint: Array.isArray(p.tint) && p.tint.length === 2 ? p.tint : ["#f1f5f9", "#e2e8f0"],
-      available: p.available !== false,
+      available: (p.available !== false) && (p.purchasable !== false),
+      outOfStock: p.stockStatus === "out_of_stock",
+      lowStockQty: p.stockStatus === "low_stock" ? Number(p.stockQuantity) : 0,
       featured: !!p.featured,
       popularity: Number(p.popularity) || 0,
       added: 0,
@@ -84,11 +86,19 @@
       const products = ((data && data.data && data.data.products) || []).map(mapProduct);
       products.forEach((p, i) => { p.added = products.length - i; });
       if (!products.length) throw new Error("empty");
-      return {
-        categories: global.BasitData.categories,
-        products,
-        offers: global.BasitData.offers,
-      };
+      // الأقسام من الـBackend — مع Fallback للثابتة عند التعذر (أوفلاين)
+      let categories = global.BasitData.categories;
+      try {
+        const cr = await fetch(url("/api/categories"));
+        if (cr.ok) {
+          const cd = await cr.json();
+          const list = cd && cd.data && cd.data.categories;
+          if (Array.isArray(list) && list.length) {
+            categories = list.map((c) => ({ id: c.slug || c.id, name: c.name, icon: c.image || c.icon || "\U0001F5C2\uFE0F" }));
+          }
+        }
+      } catch (e) { /* fallback للثابتة */ }
+      return { categories, products, offers: global.BasitData.offers };
     }
     return {
       categories: global.BasitData.categories,

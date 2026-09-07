@@ -61,9 +61,12 @@
     if (!p || !p.id) return "";
     const cat = Data.getCategory(p.category);
     const available = p.available !== false;
-    const tag = !available
-      ? '<span class="product-tag is-off">غير متوفر</span>'
-      : (p.badge ? '<span class="' + badgeClass(p.badge.tone) + '">' + esc(p.badge.text) + "</span>" : "");
+    const outOfStock = p.outOfStock === true;
+    const tag = outOfStock
+      ? '<span class="product-tag is-off">🔴 نفد المخزون</span>'
+      : !available
+        ? '<span class="product-tag is-off">غير متوفر</span>'
+        : (p.badge ? '<span class="' + badgeClass(p.badge.tone) + '">' + esc(p.badge.text) + "</span>" : "");
     const old = p.oldPrice && p.oldPrice > p.price
       ? '<span class="price-old">' + fmtPrice(p.oldPrice) + "</span>"
       : "";
@@ -71,7 +74,7 @@
     const action = available
       ? '<button type="button" class="add-btn" data-add-product="' + esc(p.id) + '" aria-label="أضف ' + esc(p.name) + ' للسلة">' +
         ADD_SVG + " أضف للسلة</button>"
-      : '<button type="button" class="add-btn is-disabled" disabled aria-label="' + esc(p.name) + ' غير متوفر حاليًا">غير متوفر حاليًا</button>';
+      : '<button type="button" class="add-btn is-disabled" disabled>' + (outOfStock ? "🔴 نفد المخزون" : "غير متوفر حاليًا") + "</button>";
 
     return (
       '<article class="product-card' + (available ? "" : " is-unavailable") + '">' +
@@ -234,8 +237,8 @@
           '<p class="pd-desc">' + esc(p.desc || "") + "</p>" +
           '<div class="pd-prices"><span class="price price-lg">' + fmtPrice(p.price) + "</span>" + old + off + "</div>" +
           '<p class="pd-stock ' + (available ? "in" : "out") + '">' +
-            '<span aria-hidden="true">' + (available ? "✅" : "⛔") + "</span> " +
-            (available ? "متوفر" : "غير متوفر") +
+            '<span aria-hidden="true">' + (p.outOfStock === true ? "🔴" : available ? "✅" : "⛔") + "</span> " +
+            (p.outOfStock === true ? "نفد المخزون" : available ? ("متوفر" + (p.lowStockQty > 0 ? " — ⚠️ باقي " + p.lowStockQty + " فقط" : "")) : "غير متوفر") +
           "</p>" +
           (available
             ? '<div class="pd-buy">' +
@@ -246,7 +249,7 @@
                 "</div>" +
                 '<button type="button" class="btn btn-primary btn-lg pd-add" id="pdAdd">' + ADD_SVG + " أضف للسلة</button>" +
               "</div>"
-            : '<button type="button" class="btn btn-block is-disabled" disabled>غير متوفر حاليًا</button>') +
+            : '<button type="button" class="btn btn-block is-disabled" disabled>' + (p.outOfStock === true ? "🔴 نفد المخزون" : "غير متوفر حاليًا") + "</button>") +
         "</div>" +
       "</div>" +
       (related.length

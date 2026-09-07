@@ -24,8 +24,9 @@ function seedProducts(db, force) {
   const insert = db.prepare(
     `INSERT INTO products
      (id, name, category, description, price, old_price, unit, image, tint,
-      badge_text, badge_tone, available, featured, offer, stock_quantity, popularity)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`
+      badge_text, badge_tone, available, featured, offer, stock_quantity,
+      stock_tracking, low_stock_threshold, popularity)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`
   );
   let n = 0;
   for (const p of SEED_PRODUCTS) {
@@ -35,10 +36,12 @@ function seedProducts(db, force) {
       p.id, p.name, p.category, p.desc || "", p.price, p.oldPrice ?? null,
       p.unit || "", p.icon || "", JSON.stringify(p.tint || []),
       badgeText, badgeTone, p.available ? 1 : 0, p.featured ? 1 : 0, offer,
-      p.available ? STOCK_DEFAULT : 0, p.popularity ?? 50
+      p.available ? STOCK_DEFAULT : 0, 1, 5, p.popularity ?? 50
     );
     n++;
   }
+  // عينات Demo للمخزون: منتج منخفض + منتجان نافذان (p22/p28 غير متاحين أصلًا)
+  db.prepare("UPDATE products SET stock_quantity = 3 WHERE id = 'p05';").run();
   console.log(`[seed] تمت زراعة ${n} منتجًا تجريبيًا.`);
   return n;
 }

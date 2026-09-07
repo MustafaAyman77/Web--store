@@ -11,6 +11,7 @@ import { generateOrderNumber } from "../utils/order-number.js";
 import { validateEgyptianPhone } from "../utils/phone.js";
 import { ApiError } from "../utils/api-error.js";
 import { sendOrderNotification } from "./telegram.service.js";
+import { deductForOrder, restoreForOrder } from "./inventory.service.js";
 
 export const ORDER_STATUSES = [
   "new", "confirmed", "preparing", "ready",
@@ -104,17 +105,19 @@ export async function createOrder(body) {
       if (Number(p.available) !== 1) {
         throw ApiError.badRequest("PRODUCT_UNAVAILABLE", `"${p.name}" غير متوفر حاليًا.`);
       }
-      if (p.stock_quantity !== null && Number(p.stock_quantity) < quantity) {
-        throw ApiError.badRequest("INSUFFICIENT_STOCK", `الكمية المتاحة من "${p.name}" غير كافية.`);
+      const tracked = Number(p.stock_tracking) === 1;
+      if (tracked && Number(p.stock_quantity) < quantity) {
+        throw ApiError.badRequest("INSUFFICIENT_STOCK", "الكمية المطلوبة من هذا المنتج غير متاحة حاليًا");
       }
       const price = Number(p.price);
-      if (!Number.isFinite(price) || price <= 0) {
+      if (!Number.isFinite(price) || price < 0) {
         throw ApiError.badRequest("INVALID_PRICE", "سعر المنتج غير صالح.");
       }
-      return { productId: p.id, productName: p.name, quantity, price, subtotal: price * quantity };
+      return { productId: p.id, productName: p.name, quantity, price, subtotal: price * quantity, tracked };
     });
 
     const subtotal = lines.reduce((s, l) => s + l.subtotal, 0);
+    const trackedLines = lines.filter((l) => l.tracked);
     const deliveryFee = input.fulfillmentMethod === "delivery" ? env.delivery.fee : null;
     const total = subtotal + (deliveryFee || 0);
 
@@ -136,20 +139,18 @@ export async function createOrder(body) {
     const orderNumber = generateOrderNumber(db);
     db.prepare(
       `INSERT INTO orders
-       (id, order_number, customer_id, subtotal, delivery_fee, total, fulfillment_method, notes, status, telegram_status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', ?);`
-    ).run(orderId, orderNumber, customer.id, subtotal, deliveryFee, total, input.fulfillmentMethod, input.notes, env.telegram.enabled ? "pending" : "disabled");
+       (id, order_number, customer_id, subtotal, delivery_fee, total, fulfillment_method, notes, status, telegram_status, stock_deducted)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?);`
+    ).run(orderId, orderNumber, customer.id, subtotal, deliveryFee, total, input.fulfillmentMethod, input.notes, env.telegram.enabled ? "pending" : "disabled", trackedLines.length ? 1 : 0);
 
     const insertItem = db.prepare(
       "INSERT INTO order_items (id, order_id, product_id, product_name, quantity, price, subtotal) VALUES (?, ?, ?, ?, ?, ?, ?);"
     );
-    const decStock = db.prepare(
-      "UPDATE products SET stock_quantity = stock_quantity - ?, updated_at = datetime('now') WHERE id = ? AND stock_quantity IS NOT NULL;"
-    );
     for (const l of lines) {
       insertItem.run(uuidv4(), orderId, l.productId, l.productName, l.quantity, l.price, l.subtotal);
-      decStock.run(l.quantity, l.productId);
     }
+    // خصم المخزون + تسجيل حركات بيع — داخل نفس الـTransaction
+    if (trackedLines.length) deductForOrder(db, trackedLines, orderNumber);
 
     return {
       orderId,
@@ -229,7 +230,7 @@ export function listOrders({ status, search, limit = 20, offset = 0, page } = {}
   return { orders: rows, total: totalRow.count, limit, offset, page: Math.floor(offset / limit) + 1 };
 }
 
-export function updateOrderStatus(ref, status) {
+export function updateOrderStatus(ref, status, actor) {
   if (!ORDER_STATUSES.includes(status)) {
     throw ApiError.badRequest("INVALID_STATUS", "حالة الطلب غير صحيحة.");
   }
@@ -245,8 +246,15 @@ export function updateOrderStatus(ref, status) {
       `لا يمكن نقل الطلب من "${order.status}" إلى "${status}".`
     );
   }
-  db.prepare("UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?;").run(status, order.id);
-  return { orderId: order.id, orderNumber: order.order_number, status, prevStatus: order.status };
+  const restored = transaction((tx) => {
+    tx.prepare("UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?;").run(status, order.id);
+    // الإلغاء يعيد المخزون مرة واحدة فقط (لطلبات خُصم مخزونها فعلًا)
+    if (status === "cancelled" && Number(order.stock_deducted) === 1 && Number(order.stock_restored) !== 1) {
+      return restoreForOrder(tx, order.id, order.order_number, actor || "");
+    }
+    return 0;
+  });
+  return { orderId: order.id, orderNumber: order.order_number, status, prevStatus: order.status, stockRestored: restored };
 }
 
 export function getCustomerById(id) {
