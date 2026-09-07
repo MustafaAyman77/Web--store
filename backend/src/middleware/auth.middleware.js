@@ -34,3 +34,10 @@ export function requireAdmin(req, res, next) {
   req.admin = { username: session.username };
   return next();
 }
+
+/** تدمير الجلسة الحالية (تسجيل الخروج) */
+export function destroySessionByRequest(req) {
+  const header = String(req.headers.authorization || "");
+  const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+  if (token) sessions.delete(token);
+}

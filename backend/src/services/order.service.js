@@ -17,6 +17,19 @@ export const ORDER_STATUSES = [
   "out_for_delivery", "completed", "cancelled",
 ];
 
+/** انتقالات الحالة المسموحة — completed/cancelled نهائية ولا خروج منها */
+export const ORDER_TRANSITIONS = {
+  new: ["confirmed", "cancelled"],
+  confirmed: ["preparing", "cancelled"],
+  preparing: ["ready", "cancelled"],
+  ready: ["out_for_delivery", "cancelled"],
+  out_for_delivery: ["completed", "cancelled"],
+  completed: [],
+  cancelled: [],
+};
+
+export const allowedNext = (status) => [...(ORDER_TRANSITIONS[status] || [])];
+
 const MAX_QTY = 20;
 
 /* ================= التحقق من المدخلات ================= */
@@ -186,23 +199,34 @@ export function getOrderByIdOrNumber(ref) {
   };
 }
 
-export function listOrders({ status, limit = 20, offset = 0 } = {}) {
+export function listOrders({ status, search, limit = 20, offset = 0, page } = {}) {
+  limit = Math.min(100, Math.max(1, Number(limit) || 20));
+  if (page) offset = (Math.max(1, Number(page) || 1) - 1) * limit;
+  else offset = Math.max(0, Number(offset) || 0);
   const db = getDb();
-  const where = status ? "WHERE o.status = ?" : "";
-  const params = status ? [status, limit, offset] : [limit, offset];
+  const conds = [];
+  const vals = [];
+  if (status) { conds.push("o.status = ?"); vals.push(status); }
+  if (search) {
+    conds.push("(o.order_number LIKE ? OR c.name LIKE ? OR c.phone LIKE ?)");
+    const like = `%${String(search).slice(0, 60)}%`;
+    vals.push(like, like, like);
+  }
+  const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
   const rows = db.prepare(
     `SELECT o.id, o.order_number AS orderNumber, o.status, o.subtotal, o.delivery_fee AS deliveryFee,
             o.total, o.fulfillment_method AS fulfillmentMethod, o.created_at AS createdAt,
             o.telegram_status AS telegramStatus,
             c.name AS customerName, c.phone AS customerPhone,
-            (SELECT COUNT(*) FROM order_items WHERE order_id = o.id) AS linesCount
+            (SELECT COUNT(*) FROM order_items WHERE order_id = o.id) AS linesCount,
+            (SELECT COALESCE(SUM(quantity), 0) FROM order_items WHERE order_id = o.id) AS itemsCount
      FROM orders o JOIN customers c ON c.id = o.customer_id
      ${where} ORDER BY o.created_at DESC LIMIT ? OFFSET ?;`
-  ).all(...params);
-  const totalRow = status
-    ? db.prepare("SELECT COUNT(*) AS count FROM orders WHERE status = ?;").get(status)
-    : db.prepare("SELECT COUNT(*) AS count FROM orders;").get();
-  return { orders: rows, total: totalRow.count, limit, offset };
+  ).all(...vals, limit, offset);
+  const totalRow = db.prepare(
+    `SELECT COUNT(*) AS count FROM orders o JOIN customers c ON c.id = o.customer_id ${where};`
+  ).get(...vals);
+  return { orders: rows, total: totalRow.count, limit, offset, page: Math.floor(offset / limit) + 1 };
 }
 
 export function updateOrderStatus(ref, status) {
@@ -212,8 +236,17 @@ export function updateOrderStatus(ref, status) {
   const db = getDb();
   const order = db.prepare("SELECT * FROM orders WHERE id = ? OR order_number = ?;").get(ref, ref);
   if (!order) throw ApiError.notFound("ORDER_NOT_FOUND", "الطلب غير موجود.");
+  if (order.status === status) {
+    return { orderId: order.id, orderNumber: order.order_number, status, unchanged: true };
+  }
+  if (!allowedNext(order.status).includes(status)) {
+    throw ApiError.badRequest(
+      "INVALID_TRANSITION",
+      `لا يمكن نقل الطلب من "${order.status}" إلى "${status}".`
+    );
+  }
   db.prepare("UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?;").run(status, order.id);
-  return { orderId: order.id, orderNumber: order.order_number, status };
+  return { orderId: order.id, orderNumber: order.order_number, status, prevStatus: order.status };
 }
 
 export function getCustomerById(id) {

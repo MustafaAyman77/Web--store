@@ -73,5 +73,17 @@ CREATE TABLE IF NOT EXISTS admins (
   id            TEXT PRIMARY KEY,            -- UUID
   username      TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,               -- bcrypt — لا يُعرض عبر API أبدًا
+  role          TEXT NOT NULL DEFAULT 'owner', -- owner | manager | staff (مستقبلًا)
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id             TEXT PRIMARY KEY,
+  admin_username TEXT NOT NULL,
+  action         TEXT NOT NULL,               -- login | order.status | product.create | ...
+  entity         TEXT NOT NULL DEFAULT '',    -- order | product | ...
+  entity_id      TEXT NOT NULL DEFAULT '',
+  meta           TEXT,                        -- JSON إضافي
+  created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_logs(entity, entity_id);

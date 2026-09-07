@@ -47,6 +47,19 @@ function migrate(database) {
   // طلبات قديمة قبل نظام Telegram → معطّلة، وأي إرسال متقطع → فاشل
   database.exec("UPDATE orders SET telegram_status = 'disabled' WHERE telegram_status = 'pending';");
   database.exec("UPDATE orders SET telegram_status = 'failed', telegram_error = 'interrupted: server restarted during send' WHERE telegram_status = 'sending';");
+  database.exec(`CREATE TABLE IF NOT EXISTS audit_logs (
+    id TEXT PRIMARY KEY, admin_username TEXT NOT NULL, action TEXT NOT NULL,
+    entity TEXT NOT NULL DEFAULT '', entity_id TEXT NOT NULL DEFAULT '',
+    meta TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')));`);
+  const auditCols = database.prepare("PRAGMA table_info(audit_logs);").all().map((c) => c.name);
+  if (auditCols.includes("actor") && !auditCols.includes("admin_username")) {
+    database.exec("ALTER TABLE audit_logs RENAME COLUMN actor TO admin_username;");
+  }
+  database.exec("CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_logs(entity, entity_id);");
+  const adminCols = database.prepare("PRAGMA table_info(admins);").all().map((c) => c.name);
+  if (!adminCols.includes("role")) {
+    database.exec("ALTER TABLE admins ADD COLUMN role TEXT NOT NULL DEFAULT 'owner';");
+  }
 }
 
 /** تنفيذ دالة داخل Transaction — أي خطأ = Rollback تلقائي */

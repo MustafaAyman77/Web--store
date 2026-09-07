@@ -54,6 +54,12 @@ export function createApp() {
   app.use("/api/customers", customersRoutes);
   app.use("/api/admin", adminRoutes);
 
+  // ---------- لوحة التحكم (SPA — كل مسارات /admin تخدم index.html) ----------
+  app.get("/admin*", (req, res, next) => {
+    if (/\.[a-zA-Z0-9]+$/.test(req.path)) return next(); // ملفات css/js الفعلية
+    res.sendFile(path.join(FRONTEND_DIR, "admin", "index.html"));
+  });
+
   // ---------- Frontend (يُقدَّم من نفس السيرفر) ----------
   app.use(express.static(FRONTEND_DIR, { extensions: ["html"] }));
   app.get("/", (req, res) => res.sendFile(path.join(FRONTEND_DIR, "index.html")));

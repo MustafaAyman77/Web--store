@@ -15,7 +15,7 @@ function normalizeAr(str) {
     .trim();
 }
 
-function toPublicProduct(row) {
+export function toPublicProduct(row) {
   let tint = [];
   try { tint = JSON.parse(row.tint || "[]"); } catch { tint = []; }
   return {
@@ -67,7 +67,7 @@ export function listProducts(req, res) {
 
 export function getProductById(req, res) {
   const db = getDb();
-  const row = db.prepare("SELECT * FROM products WHERE id = ?;").get(req.params.id);
+  const row = db.prepare("SELECT * FROM products WHERE id = ? AND available = 1;").get(req.params.id);
   if (!row) throw ApiError.notFound("PRODUCT_NOT_FOUND", "المنتج غير موجود.");
   res.json({ success: true, data: toPublicProduct(row) });
 }

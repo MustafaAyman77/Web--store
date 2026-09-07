@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>لوحة التحكم | أسواق البسيط</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2315833d'/%3E%3Cpath d='M18 44V30M28 44V22M38 44V26M48 44V34' stroke='white' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="../css/variables.css" />
+  <link rel="stylesheet" href="css/admin.css" />
+</head>
+<body>
+  <div id="adminApp" class="ad-app">
+    <header class="ad-header" id="adHeader" hidden>
+      <div class="ad-header-inner">
+        <a class="ad-brand" href="/admin/" data-link>
+          <span class="ad-brand-icon" aria-hidden="true">📊</span>
+          <span class="ad-brand-text"><strong>أسواق البسيط</strong><small>لوحة التحكم</small></span>
+        </a>
+        <nav class="ad-nav" aria-label="تنقل لوحة التحكم">
+          <a href="/admin/" data-link data-route="dashboard">🏠 الرئيسية</a>
+          <a href="/admin/orders" data-link data-route="orders">🧾 الطلبات</a>
+          <a href="/admin/products" data-link data-route="products">📦 المنتجات</a>
+          <a href="/admin/customers" data-link data-route="customers">👥 العملاء</a>
+        </nav>
+        <div class="ad-header-actions">
+          <a class="ad-bell" href="/admin/orders?status=new" data-link id="adBell" aria-label="الطلبات الجديدة">
+            <span aria-hidden="true">🔔</span>
+            <i id="adBellCount" hidden>0</i>
+          </a>
+          <button type="button" class="ad-logout" id="adLogout">خروج ⎋</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="ad-main" id="adView" aria-live="polite"></main>
+
+    <nav class="ad-bottomnav" id="adBottomNav" aria-label="تنقل اللوحة" hidden>
+      <a href="/admin/" data-link data-route="dashboard"><span aria-hidden="true">🏠</span><span>الرئيسية</span></a>
+      <a href="/admin/orders" data-link data-route="orders"><span aria-hidden="true">🧾</span><span>الطلبات</span></a>
+      <a href="/admin/products" data-link data-route="products"><span aria-hidden="true">📦</span><span>المنتجات</span></a>
+      <a href="/admin/customers" data-link data-route="customers"><span aria-hidden="true">👥</span><span>العملاء</span></a>
+    </nav>
+  </div>
+
+  <div id="adModalRoot"></div>
+  <div class="ad-toasts" id="adToasts" aria-live="polite"></div>
+
+  <script src="js/admin.js"></script>
+</body>
+</html>
