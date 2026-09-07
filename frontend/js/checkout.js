@@ -277,7 +277,22 @@
         UI.updateBadges();
         window.location.href = "success.html";
       } else {
-        showFormError("حدث خطأ أثناء تأكيد الطلب. من فضلك حاول مرة أخرى.");
+        const code = res && res.code;
+        if (code === "DELIVERY_DISABLED") {
+          showFormError("خدمة التوصيل غير متاحة حاليًا — اختر الاستلام من المحل.");
+          applyDeliveryAvailability(false);
+        } else if (code === "PRODUCT_UNAVAILABLE" || code === "INSUFFICIENT_STOCK" ||
+                   code === "PRODUCT_NOT_FOUND" || code === "INVALID_PRICE") {
+          showFormError("أحد المنتجات في طلبك لم يعد متوفرًا.");
+          renderSummary();
+          renderReview();
+        } else if (code === "NETWORK_ERROR") {
+          showFormError("تعذر الاتصال بالسيرفر — تأكد من تشغيل الـ Backend وحاول مرة أخرى.");
+        } else if (res && res.error) {
+          showFormError(res.error);
+        } else {
+          showFormError("حدث خطأ أثناء تأكيد الطلب. من فضلك حاول مرة أخرى.");
+        }
         submitting = false;
         setLoading(false);
       }
@@ -319,6 +334,35 @@
     });
   }
 
+  /* ================= إتاحة التوصيل من السيرفر ================= */
+
+  async function fetchDeliveryConfig() {
+    try {
+      const cfg = await global.Basit.Api.getPublicConfig();
+      if (cfg && cfg.deliveryEnabled === false) applyDeliveryAvailability(false);
+    } catch (e) { /* الوضع المحلي — الخياران متاحان */ }
+  }
+
+  function applyDeliveryAvailability(enabled) {
+    if (enabled) return;
+    const radio = document.querySelector('input[name="fulfill"][value="delivery"]');
+    const pickup = document.querySelector('input[name="fulfill"][value="pickup"]');
+    if (radio) {
+      radio.disabled = true;
+      radio.checked = false;
+      const card = radio.closest(".fulfill-card");
+      if (card) {
+        card.classList.add("is-off");
+        const small = card.querySelector(".fc-text small");
+        if (small) small.textContent = "غير متاح حاليًا.";
+      }
+    }
+    if (pickup) pickup.checked = true;
+    fulfillment = "pickup";
+    applyFulfillment();
+    UI.toast("التوصيل غير متاح حاليًا — الاستلام من المحل متاح", "🏪");
+  }
+
   function init() {
     Cart = global.Basit.Cart;
     UI = global.Basit.UI;
@@ -328,6 +372,7 @@
     applyFulfillment();
     renderSummary();
     renderReview();
+    fetchDeliveryConfig();
   }
 
   global.Basit = global.Basit || {};

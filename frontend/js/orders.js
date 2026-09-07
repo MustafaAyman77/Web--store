@@ -1,14 +1,10 @@
 /* ==========================================================================
    أسواق البسيط — Orders (طبقة تجهيز وإرسال الطلبات)
    --------------------------------------------------------------------------
-   📦 مسؤولة فقط عن: بناء Order Object + توليد رقم الطلب + الحفظ/الإرسال.
-   - createOrderPayload(): تجهيز بيانات الطلب من السلة (بدون إرسال).
-   - submitOrder(): إرسال الطلب — وضع Demo حاليًا، وBackend لاحقًا
-     دون أي تغيير في صفحة Checkout.
-   🛡️ سلامة الأسعار: يُعاد قراءة كل سعر من مصدر البيانات المركزي
-   (BasitData) وقت إنشاء الطلب — وليس من الواجهة.
-   🔮 التدفق المستقبلي (لا يُنفَّذ الآن):
-   Customer → Website → Backend API → Validate → Save → Telegram Bot → Store
+   - createOrderPayload(): تجهيز Order Object محليًا (للعرض والمراجعة).
+   - submitOrder(): الإرسال الحقيقي عبر Basit.Api → POST /api/orders عند توفر
+     السيرفر (الأسعار تُحسب هناك)، أو حفظ Demo محلي عند غيابه.
+   🔮 التدفق المستقبلي: Website → Backend API → Validate → Save → Telegram.
    ========================================================================== */
 (function (global) {
   "use strict";
@@ -17,10 +13,10 @@
   const LIST_KEY = "basitMarket_orders";
   const MAX_STORED_ORDERS = 20;
 
-  /** حالات الطلب — قابلة للتوسع مستقبلًا (ستُدار من الـ Backend لاحقًا) */
+  /** حالات الطلب — نفس حالات الـ Backend (تُدار من السيرفر لاحقًا) */
   const STATUSES = ["new", "confirmed", "preparing", "ready", "out_for_delivery", "completed", "cancelled"];
 
-  /* ================= رقم الطلب ================= */
+  /* ================= رقم الطلب (وضع Demo فقط) ================= */
 
   let usedIds = null;
   const pad2 = (n) => (n < 10 ? "0" : "") + n;
@@ -36,7 +32,7 @@
     return usedIds;
   }
 
-  /** رقم طلب فريد بصيغة BP-YYYYMMDD-XXXX — لا يتكرر داخل الجلسة */
+  /** رقم طلب تجريبي فريد بصيغة BS-YYYYMMDD-XXXX — لا يتكرر داخل الجلسة */
   function generateOrderId() {
     const used = collectUsedIds();
     const d = new Date();
@@ -44,25 +40,21 @@
     let id = "";
     let guard = 0;
     do {
-      id = "BP-" + stamp + "-" + Math.floor(1000 + Math.random() * 9000);
+      id = "BS-" + stamp + "-" + Math.floor(1000 + Math.random() * 9000);
       guard++;
     } while (used.has(id) && guard < 50);
-    if (used.has(id)) id = "BP-" + stamp + "-" + String(Date.now()).slice(-6);
+    if (used.has(id)) id = "BS-" + stamp + "-" + String(Date.now()).slice(-6);
     used.add(id);
     return id;
   }
 
-  /* ================= بناء الطلب ================= */
+  /* ================= بناء الطلب محليًا (للعرض والمراجعة) ================= */
 
   function validPrice(n) {
     n = Number(n);
     return Number.isFinite(n) && n > 0 ? n : 0;
   }
 
-  /**
-   * إعادة بناء أصناف السلة من مصدر البيانات المركزي مع التحقق.
-   * @returns {ok:true, items} أو {ok:false, code:"EMPTY"|"UNAVAILABLE"|"INVALID"}
-   */
   function buildItems() {
     const Data = global.BasitData;
     const lines = global.Basit.Cart.lines();
@@ -99,10 +91,6 @@
     return { ok: true, items };
   }
 
-  /**
-   * تجهيز Order Object كامل — جاهز للإرسال للـ Backend لاحقًا.
-   * input: { customer:{name,phone,address,area,landmark}, fulfillmentMethod, notes }
-   */
   function createOrderPayload(input) {
     input = input || {};
     const built = buildItems();
@@ -110,10 +98,12 @@
 
     const subtotal = built.items.reduce((s, it) => s + it.subtotal, 0);
     const c = input.customer || {};
+    const orderId = generateOrderId();
     return {
       ok: true,
       payload: {
-        orderId: generateOrderId(),
+        orderId,
+        orderNumber: orderId, // في وضع الـ Backend يُستبدل برقم السيرفر
         createdAt: new Date().toISOString(),
         customer: {
           name: String(c.name || ""),
@@ -124,7 +114,7 @@
         },
         items: built.items,
         subtotal,
-        deliveryFee: null, // لا يوجد سعر توصيل في النسخة التجريبية
+        deliveryFee: null,
         total: subtotal,
         fulfillmentMethod: input.fulfillmentMethod === "pickup" ? "pickup" : "delivery",
         notes: String(input.notes || ""),
@@ -133,7 +123,7 @@
     };
   }
 
-  /* ================= التخزين التجريبي ================= */
+  /* ================= التخزين المحلي (Demo + نسخة عرض) ================= */
 
   function getOrders() {
     try {
@@ -150,40 +140,48 @@
     } catch (e) { return null; }
   }
 
-  function persistDemoOrder(payload) {
-    try { localStorage.setItem(LAST_KEY, JSON.stringify(payload)); } catch (e) { /* تجاهل */ }
+  function persistOrder(order) {
+    try { localStorage.setItem(LAST_KEY, JSON.stringify(order)); } catch (e) { /* تجاهل */ }
     try {
       const list = getOrders();
-      list.unshift(payload);
+      list.unshift(order);
       localStorage.setItem(LIST_KEY, JSON.stringify(list.slice(0, MAX_STORED_ORDERS)));
     } catch (e) { /* تجاهل */ }
   }
 
   /* ================= الإرسال ================= */
 
-  function submitOrder(payload) {
-    // المسار المستقبلي: عبر Backend فقط (وهو من يرسل لـ Telegram)
-    if (global.BasitConfig.api.mode === "backend") {
-      return global.Basit.Api.submitOrder(payload).then((res) => {
-        if (res && res.ok) {
-          if (res.orderNo) payload.orderId = res.orderNo;
-          persistDemoOrder(payload);
-          return { ok: true, order: payload, mode: "backend" };
-        }
-        return { ok: false, error: (res && res.error) || "submit-failed" };
-      });
+  async function submitOrder(payload) {
+    const Api = global.Basit.Api;
+    const mode = await Api.resolveMode();
+
+    if (mode === "backend") {
+      // نرسل الحد الأدنى فقط — السيرفر يحسب الأسعار من قاعدة البيانات
+      const minimal = {
+        items: payload.items.map((it) => ({ productId: it.productId, quantity: it.quantity })),
+        customer: payload.customer,
+        fulfillmentMethod: payload.fulfillmentMethod,
+        notes: payload.notes,
+      };
+      const res = await Api.submitOrder(minimal);
+      if (res && res.ok) {
+        const order = {
+          ...payload,
+          orderId: res.orderId || payload.orderId,
+          orderNumber: res.orderNo || payload.orderId,
+          status: res.status || "new",
+          serverTotal: res.total,
+          mode: "backend",
+        };
+        persistOrder(order);
+        return { ok: true, order, mode: "backend" };
+      }
+      return { ok: false, code: res.code, error: res.message };
     }
-    // المسار الحالي: Demo محلي فقط — لا يُرسل أي شيء لأي مكان
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        try {
-          persistDemoOrder(payload);
-          resolve({ ok: true, order: payload, mode: "demo" });
-        } catch (e) {
-          resolve({ ok: false, error: String((e && e.message) || e) });
-        }
-      }, 900);
-    });
+
+    // وضع Demo المحلي — لا سيرفر متاح
+    persistOrder({ ...payload, mode: "demo" });
+    return { ok: true, order: { ...payload, mode: "demo" }, mode: "demo" };
   }
 
   /* ================= عرض الوقت بصيغة مفهومة ================= */

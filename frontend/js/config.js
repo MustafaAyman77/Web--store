@@ -30,15 +30,12 @@
       maxQtyPerItem: 20,
     },
 
-    // طبقة إرسال الطلبات (جاهزة للتوسع مستقبلًا)
-    // الوضع الحالي: "demo" — يعرض رسالة نجاح تجريبية فقط ولا يرسل أي شيء.
-    // مستقبلًا: يُغيَّر إلى "backend" مع ضبط endpoints أدناه.
+    // طبقة إرسال الطلبات
+    // mode: "auto" (افتراضي) = استخدام السيرفر عند توفره وإلا وضع Demo محلي.
+    // baseUrl فارغ = نفس الـ Origin (السيرفر يقدّم الواجهة من نفس البورت).
     api: {
-      mode: "demo", // "demo" | "backend"
-      endpoints: {
-        orders: "/api/orders",       // POST — إنشاء طلب جديد (مستقبلًا)
-        products: "/api/products",   // GET  — جلب المنتجات (مستقبلًا)
-      },
+      mode: "auto", // "auto" | "demo" | "backend"
+      baseUrl: "",
       timeoutMs: 12000,
     },
   };

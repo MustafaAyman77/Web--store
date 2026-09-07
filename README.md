@@ -1,81 +1,140 @@
 # أسواق البسيط 🛒
 
-متجر إلكتروني محلي (Frontend Prototype) لسوبر ماركت **أسواق البسيط** —
+متجر إلكتروني محلي لسوبر ماركت **أسواق البسيط** —
 شارع الحجاز، مدينة مغاغة، محافظة المنيا — مفتوح 24 ساعة.
 
-> نسخة عرض تجريبية (Demo) — لا يوجد Backend ولا إرسال حقيقي للطلبات بعد.
+> نسخة Demo محلية: واجهة عربية كاملة (RTL) + سيرفر Express حقيقي + SQLite —
+> يعمل كله على الجهاز بدون أي استضافة أو خدمات خارجية.
 
-## التشغيل
+## المعمارية
 
-لا يحتاج أي أدوات بناء — افتح الملف مباشرة أو عبر سيرفر محلي:
-
-```bash
-# الطريقة 1: سيرفر بايثون
-python3 -m http.server 8080
-
-# الطريقة 2: سيرفر Node
-npx serve .
 ```
-
-ثم افتح: `http://localhost:8080`
+CUSTOMER → FRONTEND → LOCAL EXPRESS API → SQLite DB → Telegram (معطّل الآن)
+```
 
 ## هيكل المشروع
 
 ```
-├── index.html          # الصفحة الرئيسية (RTL)
-├── products.html       # 🛒 صفحة المنتجات: بحث + أقسام + فلترة + ترتيب
-├── checkout.html       # 🧾 صفحة إتمام الطلب: بيانات + استلام + مراجعة
-├── success.html        # 🎉 صفحة نجاح الطلب
-├── css/
-│   ├── variables.css   # 🎨 الهوية والألوان (CSS Variables)
-│   ├── base.css        # التصفير والأساسيات
-│   ├── layout.css      # الهيدر والفوتر والتنقل السفلي
-│   ├── components.css  # الأزرار والبطاقات والسلة والنوافذ
-│   ├── sections.css    # أقسام الصفحة (Hero/عروض/موقع...)
-│   ├── shop.css        # صفحة المنتجات + تفاصيل المنتج + شيت الفلاتر
-│   └── checkout.css    # إتمام الطلب + مؤشر الخطوات + النجاح
-├── js/
-│   ├── config.js       # ⚙️ إعدادات المحل + نقاط الاتصال المستقبلية
-│   ├── data.js         # 📦 المكان الوحيد للمنتجات (32 تجريبي) والعروض
-│   ├── cart.js         # 🛍️ نظام السلة + LocalStorage + حماية من الأخطاء
-│   ├── api.js          # 🔌 طبقة الإرسال (وضع demo حاليًا)
-│   ├── ui.js           # 🖥️ واجهة مشتركة: كارت موحد + تفاصيل + سلة
-│   ├── shop.js         # 🔍 منطق صفحة المنتجات فقط
-│   ├── orders.js       # 📦 بناء Order Object + رقم الطلب + حفظ تجريبي
-│   ├── checkout.js     # 🧾 منطق صفحة إتمام الطلب فقط
-│   ├── success.js      # 🎉 منطق صفحة النجاح فقط
-│   └── app.js          # 🚀 نقطة التشغيل
+├── frontend/               # الواجهة (HTML + CSS + JS بدون مكتبات)
+│   ├── index.html          # الرئيسية
+│   ├── products.html       # المنتجات: بحث + فلترة + ترتيب
+│   ├── checkout.html       # إتمام الطلب
+│   ├── success.html        # نجاح الطلب
+│   ├── css/                # variables/base/layout/components/sections/shop/checkout
+│   └── js/                 # config/data/cart/api/ui/shop/orders/checkout/success/app
+├── backend/                # Node.js + Express + SQLite
+│   ├── src/
+│   │   ├── server.js       # نقطة التشغيل
+│   │   ├── app.js          # التطبيق (API + تقديم الواجهة)
+│   │   ├── config/env.js
+│   │   ├── database/       # database.js + schema.sql + seed.js + seed-data.js
+│   │   ├── routes/         # products/orders/customers/admin
+│   │   ├── controllers/
+│   │   ├── services/       # order.service.js + telegram.service.js (جاهز، معطّل)
+│   │   ├── middleware/     # error + auth
+│   │   └── utils/          # phone/order-number/api-error/async-handler
+│   ├── data/               # basit-market.db (تُبنى محليًا — لا تدخل Git)
+│   ├── .env / .env.example
+│   └── package.json
+└── README.md
 ```
 
-## رحلة التسوق (المرحلة الثانية)
+## 1. متطلبات التشغيل
 
-الرئيسية ← المنتجات (بحث/قسم/فلتر/ترتيب) ← تفاصيل المنتج (كمية +
-ترشيحات "قد يعجبك أيضًا") ← السلة (تعديل/حذف/ملخص) ← متابعة الطلب.
+- **Node.js 22+** (نستخدم `node:sqlite` المدمجة — بدون أي إعداد إضافي).
+- تحقق: `node -v` → يجب أن تكون `v22` أو أحدث.
 
-## رحلة إتمام الطلب (المرحلة الثالثة)
+## 2. التشغيل (3 أوامر)
 
-السلة ← صفحة إتمام الطلب (ملخص + بيانات + توصيل/استلام + مراجعة حية)
-← تأكيد الطلب ← Order Object برقم فريد ← حفظ تجريبي في LocalStorage
-← تفريغ السلة ← صفحة النجاح.
+```bash
+cd backend
+npm install
+npm run seed    # بناء قاعدة البيانات + 35 منتجًا تجريبيًا + حساب أدمن
+npm run dev     # تشغيل السيرفر مع إعادة التحميل التلقائي
+```
 
-## تحديث البيانات الحقيقية لاحقًا
+ثم افتح: **http://localhost:3000** (الموقع + الـ API من نفس البورت).
 
-| المطلوب | المكان |
-|---|---|
-| المنتجات / الأسعار / العروض | `js/data.js` فقط |
-| رقم الهاتف / واتساب / سوشيال | `js/config.js` → `contact` |
-| الألوان والهوية | `css/variables.css` |
-| عنوان / ساعات العمل | `js/config.js` → `store` |
+> `npm start` للتشغيل العادي. `npm run seed:force` لإعادة بناء البيانات من الصفر.
 
-## خارطة الطريق (خارج نطاق هذه المرحلة)
+## 3. Environment Variables
 
-- [ ] Backend + MySQL للمنتجات والطلبات
-- [ ] إرسال الطلبات لـ Telegram Bot عبر السيرفر (بدون كشف أي Token في الواجهة)
-- [ ] لوحة تحكم (Admin Dashboard) + المخزون
-- [ ] كوبونات ونظام ولاء
+انسخ `backend/.env.example` إلى `backend/.env` (تم ذلك تلقائيًا عند أول تثبيت):
 
-## القواعد المعتمدة في هذه النسخة
+| المتغير | الوصف | الافتراضي |
+|---|---|---|
+| `PORT` | بورت السيرفر | `3000` |
+| `DATABASE_PATH` | مسار ملف SQLite | `./data/basit-market.db` |
+| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | دخول الأدمن (تُشفَّر عند الـ seed) | `admin` / `admin123` (Demo — غيّرها) |
+| `DELIVERY_ENABLED` | قبول التوصيل (`false` = استلام فقط) | `true` |
+| `DELIVERY_FEE` | رسوم التوصيل (تُحدد لاحقًا) | `0` |
+| `TELEGRAM_ENABLED` | التفعيل في المرحلة 5 فقط | `false` |
 
-- لا بيانات حقيقية مخترعة (هاتف/سوشيال/GPS/دفع/توصيل).
-- الأسعار والمنتجات تجريبية ومُعلن عنها كذلك داخل الموقع.
-- الواجهة تعمل كاملة بدون إنترنت (لا توجد مكتبات خارجية).
+⚠️ ملف `.env` وقاعدة البيانات لا يدخلان Git أبدًا. لا توجد أسرار في الواجهة.
+
+## 4. الـ API
+
+| الطريقة | المسار | الوصف |
+|---|---|---|
+| GET | `/api/health` | فحص السيرفر |
+| GET | `/api/config` | إعدادات عامة (بدون أسرار) |
+| GET | `/api/products` | المنتجات + `?category=&search=&available=&featured=&offer=` |
+| GET | `/api/products/:id` | منتج واحد |
+| POST | `/api/orders` | إنشاء طلب `{items:[{productId,quantity}], customer, fulfillmentMethod, notes}` |
+| GET | `/api/orders/:ref` | طلب بالـ UUID أو رقم الطلب |
+| GET | `/api/customers?phone=` | بحث عن عميل |
+| POST | `/api/admin/login` | دخول الأدمن → Token |
+| GET | `/api/admin/orders` | كل الطلبات 🔒 |
+| PATCH | `/api/admin/orders/:ref/status` | تغيير الحالة 🔒 |
+
+صيغة الرد: `{success: true, data: {...}}` أو `{success: false, error: {code, message}}`.
+
+## 5. اختبار سريع (curl)
+
+```bash
+# الصحة والمنتجات
+curl localhost:3000/api/health
+curl "localhost:3000/api/products?search=بيبسي"
+
+# إنشاء طلب (السعر يُحسب من الـDB — أي سعر مرسل يُتجاهل)
+curl -X POST localhost:3000/api/orders -H 'Content-Type: application/json' -d '{
+  "items": [{"productId": "p01", "quantity": 2}],
+  "customer": {"name": "عميل تجريبي", "phone": "01001234567", "address": "شارع الحجاز"},
+  "fulfillmentMethod": "delivery", "notes": ""
+}'
+
+# دخول الأدمن ثم عرض الطلبات
+TOKEN=$(curl -s -X POST localhost:3000/api/admin/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin123"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['token'])")
+curl "localhost:3000/api/admin/orders" -H "Authorization: Bearer $TOKEN"
+```
+
+## 6. رحلة المستخدم الكاملة
+
+الرئيسية ← المنتجات (بحث/فلتر/ترتيب) ← التفاصيل ← السلة ←
+إتمام الطلب (توصيل/استلام + مراجعة) ← `POST /api/orders` ← حفظ في SQLite ←
+رقم طلب `BS-YYYYMMDD-NNNN` ← صفحة النجاح ← استرجاع من الـ API.
+
+> الواجهة تكتشف السيرفر تلقائيًا (`mode: "auto"` في `frontend/js/config.js`) —
+> لو السيرفر مطفي تعمل بوضع Demo محلي، ولو شغال تستخدمه كمصدر أساسي.
+
+## 7. قواعد الأمان المطبقة
+
+- الأسعار والإجماليات تُحسب في السيرفر فقط (مقاومة للتلاعب) داخل Transaction.
+- كلمات المرور مشفَّرة (bcrypt) ولا تُعرض عبر أي API.
+- لا Bot Token ولا أسرار في الواجهة أو الـ Git — فقط `backend/.env` (مستبعد).
+- التحقق من التوفر والمخزون والهاتف المصري (11 رقمًا) في السيرفر.
+
+## 8. الإيقاف والتشغيل
+
+- الإيقاف: `Ctrl+C` في نافذة السيرفر.
+- التشغيل مجددًا: `cd backend && npm run dev` (البيانات محفوظة في `data/`).
+- تصفير البيانات: `npm run seed:force`.
+
+## خارطة الطريق
+
+- [x] المراحل 1–3: الواجهة كاملة
+- [x] المرحلة 4: Backend محلي + SQLite + REST API ✅ (أنت هنا)
+- [ ] المرحلة 5: ربط Telegram Bot الحقيقي (البنية جاهزة في `telegram.service.js`)
+- [ ] لاحقًا: نقل أونلاين + لوحة إدارة + دفع

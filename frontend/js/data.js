@@ -170,6 +170,16 @@
       if (!oldPrice || oldPrice <= newPrice) return 0;
       return Math.round(((oldPrice - newPrice) / oldPrice) * 100);
     },
+    /**
+     * استبدال البيانات المحلية ببيانات الـ Backend (تُستدعى مرة عند الإقلاع).
+     * تُعدَّل المصفوفات في مكانها حتى تبقى كل المراجع سليمة.
+     */
+    _replaceAll(data) {
+      if (data && Array.isArray(data.products) && data.products.length) {
+        PRODUCTS.length = 0;
+        data.products.forEach((p) => { if (p && p.id) PRODUCTS.push(p); });
+      }
+    },
   };
 
   global.BasitData = BasitData;
