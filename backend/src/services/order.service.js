@@ -14,6 +14,7 @@ import { sendOrderNotification } from "./telegram.service.js";
 import { deductForOrder, restoreForOrder } from "./inventory.service.js";
 import { assertCustomerCanOrder } from "./customer.service.js";
 import { getSettings } from "./settings.service.js";
+import { resolvePromosForProducts } from "./promotion.service.js";
 import { recordStatusChange } from "./status-history.service.js";
 import { createStatusNotification } from "./notification.service.js";
 
@@ -98,6 +99,7 @@ function validatePayload(body) {
 
 function priceLines(db, items) {
   const getProduct = db.prepare("SELECT * FROM products WHERE id = ?;");
+  const promoMap = resolvePromosForProducts(db, items.map((it) => it.productId));
   const lines = items.map(({ productId, quantity }) => {
     const p = getProduct.get(productId);
     if (!p) throw ApiError.notFound("PRODUCT_NOT_FOUND", `المنتج غير موجود (${productId}).`);
@@ -108,13 +110,23 @@ function priceLines(db, items) {
     if (tracked && Number(p.stock_quantity) < quantity) {
       throw ApiError.badRequest("INSUFFICIENT_STOCK", "الكمية المطلوبة من هذا المنتج غير متاحة حاليًا");
     }
-    const price = Number(p.price);
-    if (!Number.isFinite(price) || price < 0) {
+    const base = Number(p.price);
+    if (!Number.isFinite(base) || base < 0) {
       throw ApiError.badRequest("INVALID_PRICE", "سعر المنتج غير صالح.");
     }
-    return { productId: p.id, productName: p.name, quantity, price, subtotal: price * quantity, tracked };
+    // السعر النهائي بعد العرض الفائز (إن وجد) + لقطة كاملة للفاتورة
+    const hit = promoMap[p.id];
+    const price = hit ? hit.finalPrice : base;
+    const discount = hit ? Math.round((base - hit.finalPrice) * 100) / 100 : 0;
+    return {
+      productId: p.id, productName: p.name, quantity, price, subtotal: price * quantity, tracked,
+      originalPrice: base, discountAmount: discount,
+      promotionId: hit ? hit.promo.id : null, promotionName: hit ? hit.promo.name : "",
+    };
   });
-  return { lines, subtotal: lines.reduce((s, l) => s + l.subtotal, 0) };
+  const subtotal = lines.reduce((s, l) => s + l.subtotal, 0);
+  const originalSubtotal = lines.reduce((s, l) => s + l.originalPrice * l.quantity, 0);
+  return { lines, subtotal, originalSubtotal, discountTotal: Math.round((originalSubtotal - subtotal) * 100) / 100 };
 }
 
 /* ================= بوابات المتجر + حساب التوصيل (Backend فقط) ================= */
@@ -174,7 +186,7 @@ export function quoteTotals(body) {
     return { productId, quantity };
   });
   const db = getDb();
-  const { subtotal } = priceLines(db, normalized);
+  const { subtotal, originalSubtotal, discountTotal } = priceLines(db, normalized);
   const fulfillmentMethod = body?.fulfillmentMethod === "pickup" ? "pickup" : "delivery";
   const ff = resolveFulfillment(db, {
     fulfillmentMethod,
@@ -183,7 +195,8 @@ export function quoteTotals(body) {
   });
   return {
     fulfillmentMethod,
-    subtotal, deliveryFee: ff.deliveryFee, total: subtotal + (ff.deliveryFee || 0),
+    subtotal, originalSubtotal, discountTotal,
+    deliveryFee: ff.deliveryFee, total: subtotal + (ff.deliveryFee || 0),
     deliveryZoneId: ff.zoneId, deliveryZoneName: ff.zoneName,
   };
 }
@@ -195,7 +208,7 @@ export async function createOrder(body) {
 
   const result = transaction((db) => {
     // 1) التحقق من الأصناف + حساب الأسعار من الـDB
-    const { lines, subtotal } = priceLines(db, input.items);
+    const { lines, subtotal, originalSubtotal, discountTotal } = priceLines(db, input.items);
     const trackedLines = lines.filter((l) => l.tracked);
     // 1ب) بوابات المتجر + رسوم التوصيل من الـDB (لا ثقة بأي قيمة من المتصفح)
     const ff = resolveFulfillment(db, {
@@ -237,10 +250,11 @@ export async function createOrder(body) {
     ).run(orderId, orderNumber, customer.id, subtotal, deliveryFee, total, input.fulfillmentMethod, ff.zoneId, ff.zoneName, input.notes, env.telegram.enabled ? "pending" : "disabled", trackedLines.length ? 1 : 0);
 
     const insertItem = db.prepare(
-      "INSERT INTO order_items (id, order_id, product_id, product_name, quantity, price, subtotal) VALUES (?, ?, ?, ?, ?, ?, ?);"
+      "INSERT INTO order_items (id, order_id, product_id, product_name, quantity, price, subtotal, original_price, final_price, discount_amount, promotion_id, promotion_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);"
     );
     for (const l of lines) {
-      insertItem.run(uuidv4(), orderId, l.productId, l.productName, l.quantity, l.price, l.subtotal);
+      insertItem.run(uuidv4(), orderId, l.productId, l.productName, l.quantity, l.price, l.subtotal,
+        l.originalPrice, l.price, l.discountAmount, l.promotionId, l.promotionName);
     }
     // خصم المخزون + تسجيل حركات بيع — داخل نفس الـTransaction
     if (trackedLines.length) deductForOrder(db, trackedLines, orderNumber);
@@ -256,6 +270,8 @@ export async function createOrder(body) {
       orderNumber,
       status: "new",
       subtotal,
+      originalSubtotal,
+      discountTotal,
       deliveryFee,
       total,
       fulfillmentMethod: input.fulfillmentMethod,
@@ -284,7 +300,7 @@ export function getOrderByIdOrNumber(ref) {
   let order = db.prepare("SELECT * FROM orders WHERE id = ?;").get(ref);
   if (!order) order = db.prepare("SELECT * FROM orders WHERE order_number = ?;").get(ref);
   if (!order) throw ApiError.notFound("ORDER_NOT_FOUND", "الطلب غير موجود.");
-  const items = db.prepare("SELECT product_id AS productId, product_name AS name, quantity, price, subtotal FROM order_items WHERE order_id = ?;").all(order.id);
+  const items = db.prepare("SELECT product_id AS productId, product_name AS name, quantity, price, subtotal, original_price AS originalPrice, discount_amount AS discountAmount, promotion_name AS promotionName FROM order_items WHERE order_id = ?;").all(order.id);
   const customer = db.prepare("SELECT id, name, phone, address, area, landmark FROM customers WHERE id = ?;").get(order.customer_id);
   return {
     orderId: order.id,
@@ -388,7 +404,7 @@ export function trackOrder({ orderNumber, phone }) {
     .get(ref, normalized);
   if (!order) throw ApiError.notFound("ORDER_NOT_FOUND", TRACK_FAIL);
   const items = db
-    .prepare("SELECT product_name AS name, quantity, price, subtotal FROM order_items WHERE order_id = ?;")
+    .prepare("SELECT product_name AS name, quantity, price, subtotal, original_price AS originalPrice, discount_amount AS discountAmount, promotion_name AS promotionName FROM order_items WHERE order_id = ?;")
     .all(order.id);
   return {
     orderNumber: order.order_number,

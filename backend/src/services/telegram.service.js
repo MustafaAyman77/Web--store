@@ -128,7 +128,7 @@ function getDetails(db, order) {
     .prepare("SELECT name, phone, address, area, landmark FROM customers WHERE id = ?;")
     .get(order.customer_id) || {};
   const items = db
-    .prepare("SELECT product_name AS name, quantity, price, subtotal FROM order_items WHERE order_id = ?;")
+    .prepare("SELECT product_name AS name, quantity, price, subtotal, original_price AS originalPrice, discount_amount AS discountAmount, promotion_name AS promotionName FROM order_items WHERE order_id = ?;")
     .all(order.id);
   return { order, customer, items };
 }
@@ -165,12 +165,24 @@ function buildOrderMessage({ order, customer, items }) {
     const num = NUM_EMOJI[i] || `${i + 1}.`;
     lines.push(`${num} <b>${escapeHtml(it.name)}</b>`);
     lines.push(`الكمية: ${it.quantity}`);
-    lines.push(`السعر: ${it.price} جنيه`);
+    if (it.originalPrice && Number(it.originalPrice) > Number(it.price)) {
+      lines.push(`السعر: ${it.originalPrice} ← <b>${it.price} جنيه (عرض)</b>`);
+    } else {
+      lines.push(`السعر: ${it.price} جنيه`);
+    }
     lines.push(`الإجمالي: ${it.subtotal} جنيه`);
     lines.push("");
   });
   lines.push(DIV);
   lines.push("");
+  const origTotal = items.reduce((sum, it) => sum + (Number(it.originalPrice) || Number(it.price)) * Number(it.quantity), 0);
+  const discountTotal = Math.round((origTotal - Number(order.subtotal)) * 100) / 100;
+  if (discountTotal > 0) {
+    lines.push(`🧾 <b>إجمالي قبل الخصم:</b>\n${origTotal} جنيه`);
+    lines.push("");
+    lines.push(`🎉 <b>الخصم:</b>\n${discountTotal} جنيه`);
+    lines.push("");
+  }
   lines.push(`💰 <b>المجموع الفرعي:</b>\n${order.subtotal} جنيه`);
   lines.push("");
   lines.push(`🚚 <b>التوصيل:</b>\n${order.delivery_fee === null ? "غير محدد" : order.delivery_fee + " جنيه"}`);

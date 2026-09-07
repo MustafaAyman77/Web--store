@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>حسابي | أسواق البسيط</title>
-  <meta name="description" content="حسابك في أسواق البسيط — بياناتك وطلباتك وإعادة الطلب." />
+  <title>العروض | أسواق البسيط</title>
+  <meta name="description" content="عروض أسواق البسيط — خصومات حقيقية على منتجات مختارة في شارع الحجاز، مغاغة." />
   <meta name="theme-color" content="#15803d" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2316a34a'/%3E%3Cpath d='M16 20h8l4 16h16l4-12H24' stroke='white' stroke-width='4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='28' cy='46' r='3.4' fill='white'/%3E%3Ccircle cx='42' cy='46' r='3.4' fill='white'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="css/variables.css" />
@@ -13,8 +13,7 @@
   <link rel="stylesheet" href="css/components.css" />
   <link rel="stylesheet" href="css/sections.css" />
   <link rel="stylesheet" href="css/shop.css" />
-  <link rel="stylesheet" href="css/checkout.css" />
-  <link rel="stylesheet" href="css/account.css" />
+  <link rel="stylesheet" href="css/promos.css" />
 </head>
 <body>
 
@@ -38,7 +37,7 @@
       <nav class="main-nav" aria-label="التنقل الرئيسي">
         <a href="index.html" class="nav-link">الرئيسية</a>
         <a href="products.html" class="nav-link">المنتجات</a>
-        <a href="offers.html" class="nav-link">العروض <i class="nav-fire" aria-hidden="true">🔥</i></a>
+        <a href="offers.html" class="nav-link is-active" aria-current="page">العروض <i class="nav-fire" aria-hidden="true">🔥</i></a>
         <a href="index.html#location" class="nav-link">المحل</a>
       </nav>
 
@@ -60,14 +59,20 @@
     </div>
   </header>
 
-  <main class="co-page">
+  <main class="shop-page" id="offersTop">
     <div class="container">
       <nav class="crumbs" aria-label="مسار الصفحة">
         <a href="index.html">الرئيسية</a>
         <span aria-hidden="true">←</span>
-        <span aria-current="page">حسابي</span>
+        <span aria-current="page">العروض</span>
       </nav>
-      <div id="accountRoot" aria-live="polite"></div>
+
+      <div class="shop-head reveal">
+        <h1>عروض أسواق البسيط 🔥</h1>
+        <p>خصومات حقيقية على منتجات مختارة — الأسعار بعد الخصم تُحسب تلقائيًا في السلة.</p>
+      </div>
+
+      <div id="offersList" aria-live="polite"></div>
     </div>
   </main>
 
@@ -124,7 +129,7 @@
     <a href="products.html" class="bn-item" data-nav="products">
       <span class="bn-icon" aria-hidden="true">🛒</span><span class="bn-label">المنتجات</span>
     </a>
-    <a href="offers.html" class="bn-item" data-nav="offers">
+    <a href="offers.html" class="bn-item is-active" data-nav="offers" aria-current="page">
       <span class="bn-icon" aria-hidden="true">🔥</span><span class="bn-label">العروض</span>
     </a>
     <button type="button" class="bn-item" id="bottomCartBtn" data-nav="cart" aria-label="فتح سلة المشتريات">
@@ -146,6 +151,28 @@
     <div class="drawer-foot" id="cartFoot"></div>
   </aside>
 
+  <!-- ===================== Checkout modal ===================== -->
+  <div class="modal" id="checkoutModal" role="dialog" aria-modal="true" aria-label="تأكيد الطلب" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3>🧾 تأكيد الطلب</h3>
+        <button type="button" class="icon-btn" id="checkoutCloseBtn" aria-label="إغلاق نافذة تأكيد الطلب">✕</button>
+      </div>
+      <div class="modal-body" id="checkoutBody"></div>
+    </div>
+  </div>
+
+  <!-- ===================== Product details modal ===================== -->
+  <div class="modal product-modal" id="productModal" role="dialog" aria-modal="true" aria-label="تفاصيل المنتج" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3>🔎 تفاصيل المنتج</h3>
+        <button type="button" class="icon-btn" id="productCloseBtn" aria-label="إغلاق تفاصيل المنتج">✕</button>
+      </div>
+      <div class="modal-body" id="productBody"></div>
+    </div>
+  </div>
+
   <!-- ===================== Toasts ===================== -->
   <div class="toast-wrap" id="toastWrap" aria-live="polite" aria-atomic="false"></div>
 
@@ -159,7 +186,7 @@
   <script src="js/store.js"></script>
   <script src="js/notif.js"></script>
   <script src="js/ui.js"></script>
-  <script src="js/account.js"></script>
+  <script src="js/offers.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

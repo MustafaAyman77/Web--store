@@ -5,6 +5,7 @@ import { getDb } from "../database/database.js";
 import { ApiError } from "../utils/api-error.js";
 import { stockStatusOf, discountPercent, isPurchasable, adminStatusOf, isNewProduct } from "../utils/product-status.js";
 import { env } from "../config/env.js";
+import { resolvePromosForProducts } from "../services/promotion.service.js";
 
 /** تطبيع النص العربي للبحث (نفس منطق الواجهة) */
 function normalizeAr(str) {
@@ -17,15 +18,24 @@ function normalizeAr(str) {
     .trim();
 }
 
-export function toPublicProduct(row) {
+export function toPublicProduct(row, promoMap) {
   let tint = [];
   try { tint = JSON.parse(row.tint || "[]"); } catch { tint = []; }
+  const base = Number(row.price);
+  const hit = promoMap ? promoMap[row.id] : null;
+  const finalPrice = hit ? hit.finalPrice : base;
+  const promotion = hit ? {
+    id: hit.promo.id, name: hit.promo.name, type: hit.promo.type,
+    endsAt: hit.promo.end_at || null,
+  } : null;
   return {
     id: row.id,
     name: row.name,
     category: row.category,
     description: row.description || "",
-    price: Number(row.price),
+    price: base,
+    finalPrice,
+    promotion,
     oldPrice: row.old_price !== null ? Number(row.old_price) : null,
     unit: row.unit || "",
     image: row.image || "",
@@ -40,7 +50,9 @@ export function toPublicProduct(row) {
     stockStatus: stockStatusOf(row),
     purchasable: isPurchasable(row),
     status: adminStatusOf(row),
-    discountPercent: discountPercent(row.price, row.old_price),
+    discountPercent: finalPrice < base
+      ? Math.round((1 - finalPrice / base) * 100)
+      : discountPercent(row.price, row.old_price),
     isNew: isNewProduct(row, env.recommendations.newProductDays),
     popularity: Number(row.popularity) || 0,
     createdAt: row.created_at,
@@ -73,12 +85,14 @@ export function listProducts(req, res) {
     });
   }
 
-  res.json({ success: true, data: { products: rows.map(toPublicProduct), total: rows.length } });
+  const promoMap = resolvePromosForProducts(db, rows.map((p) => p.id));
+  res.json({ success: true, data: { products: rows.map((r) => toPublicProduct(r, promoMap)), total: rows.length } });
 }
 
 export function getProductById(req, res) {
   const db = getDb();
   const row = db.prepare("SELECT * FROM products WHERE id = ? AND available = 1;").get(req.params.id);
   if (!row) throw ApiError.notFound("PRODUCT_NOT_FOUND", "المنتج غير موجود.");
-  res.json({ success: true, data: toPublicProduct(row) });
+  const promoMap = resolvePromosForProducts(db, [row.id]);
+  res.json({ success: true, data: toPublicProduct(row, promoMap) });
 }

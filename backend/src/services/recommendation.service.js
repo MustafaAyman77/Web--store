@@ -11,6 +11,7 @@ import { toPublicProduct } from "../controllers/products.controller.js";
 import { isPurchasable, isNewProduct } from "../utils/product-status.js";
 import { findCustomerByPhone } from "./customer.service.js";
 import { getPurchaseHistory } from "./customer-history.service.js";
+import { resolvePromosForProducts } from "./promotion.service.js";
 
 export const SCORE = {
   frequent: 50,       // يشتريه العميل بشكل متكرر
@@ -22,6 +23,7 @@ export const SCORE = {
   popular: 15,        // ضمن الأكثر مبيعًا
   offer: 10,
   featured: 5,
+  promoBoost: 3, // عليه عرض نشط — دفعة صغيرة بعد كل العوامل الأساسية
 };
 
 // ترتيب اختيار السبب المعروض (الأعلى أولوية)
@@ -134,6 +136,8 @@ export function getRecommendations({ customerId, customerPhone, cartIds, categor
     candidates.push(r);
   }
 
+  // العروض النشطة للمرشحين (استعلام واحد) — دفعة صغيرة فقط
+  const promoMap = resolvePromosForProducts(db, candidates.map((c) => c.id));
   // التسجيل
   const scored = candidates.map((r) => {
     let score = 0;
@@ -151,6 +155,7 @@ export function getRecommendations({ customerId, customerPhone, cartIds, categor
       reasons.add(isFav ? "offer_in_favorite" : "offer");
     }
     if (Number(r.featured) === 1) { score += SCORE.featured; reasons.add("featured"); }
+    if (promoMap[r.id]) { score += SCORE.promoBoost; reasons.add(isFav ? "offer_in_favorite" : "offer"); }
     if (topSellers.has(r.id)) { score += SCORE.popular; reasons.add("popular"); }
     // مرتبط بالسلة؟
     let related = false;
@@ -170,7 +175,7 @@ export function getRecommendations({ customerId, customerPhone, cartIds, categor
 
   return {
     recommendations: top.map(({ row, score, reason, times }) => ({
-      ...toPublicProduct(row),
+      ...toPublicProduct(row, promoMap),
       reason,
       score,
       boughtBefore: times > 0,

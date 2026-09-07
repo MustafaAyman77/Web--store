@@ -174,6 +174,32 @@
   };
   const fulfillName = (m) => (m === "pickup" ? "🏪 استلام من المحل" : "🚚 توصيل للمنزل");
 
+  /* ---------- العروض ---------- */
+  const PROMO_TYPES = [["percentage", "📊 نسبة مئوية"], ["fixed_discount", "💵 خصم ثابت"], ["fixed_price", "🏷️ سعر ثابت"]];
+  const promoTypeName = (t) => ((PROMO_TYPES.find((x) => x[0] === t) || ["", t])[1]);
+  const PROMO_STATUS = {
+    active: ["🟢 نشط", "st-completed"], upcoming: ["🔵 قادم", "st-out_for_delivery"],
+    expired: ["⚪ منتهي", "st-cancelled"], disabled: ["⏸️ معطّل", "st-ontg-disabled"],
+  };
+  const promoStatusBadge = (st) => {
+    const m = PROMO_STATUS[st] || [st, "st-cancelled"];
+    return '<span class="st ' + m[1] + '">' + esc(m[0]) + "</span>";
+  };
+  const promoValueText = (pr) =>
+    pr.type === "percentage" ? "خصم " + pr.discountValue + "%"
+    : pr.type === "fixed_discount" ? "خصم " + fmtPrice(pr.discountValue)
+    : "بسعر " + fmtPrice(pr.fixedPrice);
+  /** UTC (السيرفر) ←→ datetime-local (المتصفح) */
+  function utcToLocalInput(sqliteUtc) {
+    if (!sqliteUtc) return "";
+    try {
+      const d = new Date(String(sqliteUtc).replace(" ", "T") + "Z");
+      if (isNaN(d)) return "";
+      const p2 = (n) => String(n).padStart(2, "0");
+      return d.getFullYear() + "-" + p2(d.getMonth() + 1) + "-" + p2(d.getDate()) + "T" + p2(d.getHours()) + ":" + p2(d.getMinutes());
+    } catch { return ""; }
+  }
+
   function stockBadge(p) {
     if (!p.stockTracking) return '<span class="ad-stock">بدون تتبع</span>';
     const s = Number(p.stockQuantity);
@@ -329,6 +355,17 @@
         '<a class="ad-card ad-stat" data-link href="/admin/delivery"><span class="n">' + (d.deliveryEnabled === false ? "🔴" : "🟢") + '</span><span class="l">التوصيل (' + (d.zonesCount || 0) + " مناطق)</span></a>" +
         '<a class="ad-card ad-stat" data-link href="/admin/settings"><span class="n">' + (d.pickupEnabled === false ? "🔴" : "🟢") + '</span><span class="l">الاستلام من المحل</span></a>' +
         "</div>" +
+        '<h2 class="ad-section-title">🔥 العروض</h2>' +
+        '<div class="ad-stat-grid">' +
+        '<a class="ad-card ad-stat" data-link href="/admin/promotions"><span class="n">' + (d.activePromotions || 0) + '</span><span class="l">🔥 عروض نشطة</span></a>' +
+        '<a class="ad-card ad-stat" data-link href="/admin/promotions/new"><span class="n">＋</span><span class="l">عرض جديد</span></a>' +
+        "</div>" +
+        ((d.expiringPromotions && d.expiringPromotions.length)
+          ? '<div class="ad-list">' + d.expiringPromotions.map((x) =>
+            '<a class="ad-card ad-row-card" data-link href="/admin/promotions">' +
+            '<div class="ad-row-top"><strong>⏳ ' + esc(x.name) + "</strong>" + promoStatusBadge("active") + "</div>" +
+            '<div class="ad-row-meta"><span>ينتهي: <b>' + esc(fmtDT(x.endsAt)) + "</b></span></div></a>").join("") + "</div>"
+          : "") +
         '<h2 class="ad-section-title">🕐 آخر الطلبات</h2>' +
         '<div class="ad-list">' +
         (recent.orders.length
@@ -433,7 +470,14 @@
         "</section>" +
         '<section class="ad-card"><h2>🛍️ المنتجات (' + o.items.reduce((s, it) => s + it.quantity, 0) + " قطعة)</h2>" +
         o.items.map((it) =>
-          '<div class="ad-kv"><span class="k">' + esc(it.name) + " × " + it.quantity + "</span><span class='v'>" + fmtPrice(it.subtotal) + " <small style='color:var(--faint)'>(" + fmtPrice(it.price) + ")</small></span></div>").join("") +
+          '<div class="ad-kv"><span class="k">' + esc(it.name) + " × " + it.quantity +
+          (it.promotionName ? ' <small style="color:var(--brand-700)">🎉 ' + esc(it.promotionName) + "</small>" : "") +
+          "</span><span class='v'>" + fmtPrice(it.subtotal) + " <small style='color:var(--faint)'>(" + fmtPrice(it.price) +
+          (it.originalPrice && Number(it.originalPrice) > Number(it.price) ? " بدلًا من <s>" + fmtPrice(it.originalPrice) + "</s>" : "") + ")</small></span></div>").join("") +
+        (o.items.some((it) => Number(it.discountAmount) > 0)
+          ? '<div class="ad-kv"><span class="k">🎉 خصم العروض</span><span class="v" style="color:var(--brand-700)">' +
+            fmtPrice(o.items.reduce((sum, it) => sum + Number(it.discountAmount || 0) * it.quantity, 0)) + "</span></div>"
+          : "") +
         '<div class="ad-kv"><span class="k">المجموع الفرعي</span><span class="v">' + fmtPrice(o.subtotal) + "</span></div>" +
         '<div class="ad-kv"><span class="k">التوصيل</span><span class="v">' + (o.deliveryFee === null ? "—" : fmtPrice(o.deliveryFee)) + "</span></div>" +
         '<div class="ad-kv"><span class="k">💰 الإجمالي</span><span class="v" style="color:var(--brand-700);font-size:1.15rem">' + fmtPrice(o.total) + "</span></div>" +
@@ -561,7 +605,9 @@
           (p.offer ? ' <span class="st st-preparing">🔥 عرض</span>' : "") +
           (p.featured ? ' <span class="st st-out_for_delivery">⭐ مميز</span>' : "") + "</span></div>" +
           '<div class="ad-row-meta"><span>' + esc(catName(p.category)) + "</span><span>💰 <b>" + fmtPrice(p.price) + "</b></span>" +
-          (p.oldPrice && p.oldPrice > p.price ? "<span>بدلًا من <s>" + fmtPrice(p.oldPrice) + '</s> <b class="ad-off">خصم ' + (p.discountPercent || 0) + "%</b></span>" : "") +
+          (p.promotion && p.finalPrice < p.price
+            ? "<span>🔥 بعد العرض: <b>" + fmtPrice(p.finalPrice) + "</b> <small>(" + esc(p.promotion.name) + ")</small></span>"
+            : (p.oldPrice && p.oldPrice > p.price ? "<span>بدلًا من <s>" + fmtPrice(p.oldPrice) + '</s> <b class="ad-off">خصم ' + (p.discountPercent || 0) + "%</b></span>" : "")) +
           "<span>" + stockBadge(p) + "</span></div>" +
           '<div class="ad-row-actions">' +
           '<a class="ad-btn ad-btn-outline ad-btn-sm" data-link href="/admin/products/' + esc(p.id) + '/edit">✏️ تعديل</a>' +
@@ -1290,6 +1336,227 @@
     });
   }
 
+  /* ================= العروض ================= */
+
+  const PROMO_FILTERS = [["", "الكل 📋"], ["active", "نشطة 🟢"], ["upcoming", "قادمة 🔵"], ["expired", "منتهية ⚪"], ["disabled", "معطّلة ⏸️"]];
+
+  async function pagePromotions() {
+    setChrome("promotions");
+    document.title = "العروض | لوحة التحكم";
+    const qs = new URLSearchParams(location.search);
+    const status = qs.get("status") || "";
+    const page = Math.max(1, Number(qs.get("page")) || 1);
+    view.innerHTML =
+      '<div class="ad-page-head"><div><h1>🔥 العروض</h1><p>خصومات ذكية على منتجات مختارة — تُطبق تلقائيًا.</p></div>' +
+      '<a class="ad-btn ad-btn-primary ad-btn-sm" data-link href="/admin/promotions/new">＋ عرض جديد</a></div>' +
+      '<div class="ad-chips" role="tablist">' +
+      PROMO_FILTERS.map(([v, l]) => '<button type="button" role="tab" data-f="' + v + '" class="' + (v === status ? "is-active" : "") + '">' + esc(l) + "</button>").join("") +
+      '</div><div class="ad-list" id="prList">' + skel(4) + "</div><div id='prPager'></div>";
+
+    const go = (patch) => {
+      const nq = new URLSearchParams(location.search);
+      Object.entries(patch).forEach(([k, v]) => { if (!v) nq.delete(k); else nq.set(k, v); });
+      navigate("/admin/promotions" + (nq.toString() ? "?" + nq : ""));
+    };
+    view.querySelectorAll("[data-f]").forEach((b) =>
+      b.addEventListener("click", () => go({ status: b.dataset.f, page: "" })));
+
+    try {
+      const q = new URLSearchParams({ limit: "20", page: String(page) });
+      if (status) q.set("status", status);
+      const data = await api("/admin/promotions?" + q);
+      document.getElementById("prList").innerHTML = data.promotions.length
+        ? data.promotions.map((pr) =>
+          '<article class="ad-card ad-row-card">' +
+          '<div class="ad-row-top"><strong>🎉 ' + esc(pr.name) + "</strong><span>" + promoStatusBadge(pr.status) + "</span></div>" +
+          '<div class="ad-row-meta"><span>' + esc(promoTypeName(pr.type)) + ": <b>" + esc(promoValueText(pr)) + "</b></span>" +
+          "<span>🧾 " + (pr.productCount || 0) + " منتج</span>" +
+          "<span>⚡ أولوية " + (pr.priority || 0) + "</span>" +
+          (pr.startAt ? "<span>▶️ من " + esc(fmtDT(pr.startAt)) + "</span>" : "") +
+          (pr.endAt ? "<span>⏳ حتى " + esc(fmtDT(pr.endAt)) + "</span>" : "<span>♾️ بدون نهاية</span>") + "</div>" +
+          (pr.description ? '<p style="font-size:.82rem;color:var(--muted)">' + esc(pr.description) + "</p>" : "") +
+          '<div class="ad-row-actions">' +
+          '<a class="ad-btn ad-btn-outline ad-btn-sm" data-link href="/admin/promotions/' + esc(pr.id) + '/edit">✏️ تعديل</a>' +
+          '<button type="button" class="ad-btn ad-btn-outline ad-btn-sm" data-pr-toggle="' + esc(pr.id) + '" data-st="' + pr.status + '">' +
+            (pr.status === "disabled" ? "▶️ تفعيل" : "⏸️ تعطيل") + "</button>" +
+          '<button type="button" class="ad-btn ad-btn-ghost ad-btn-sm" data-pr-del="' + esc(pr.id) + '" data-name="' + esc(pr.name) + '">🗑️ حذف</button>' +
+          "</div></article>").join("")
+        : stateHTML("🔥", "لا توجد عروض", status ? "لا توجد عروض بهذه الحالة." : "أنشئ أول عرض من الزر بالأعلى.", '<a class="ad-btn ad-btn-primary" data-link href="/admin/promotions/new">＋ عرض جديد</a>');
+      const base = "/admin/promotions?" + (() => { const b = new URLSearchParams(); if (status) b.set("status", status); b.set("limit", "20"); return b.toString(); })();
+      document.getElementById("prPager").innerHTML = pagerHTML(data.page, data.total, data.limit, base);
+
+      view.querySelectorAll("[data-pr-toggle]").forEach((b) => b.addEventListener("click", async () => {
+        const enable = b.dataset.st === "disabled";
+        if (!enable) {
+          const ok = await confirmDlg("تعطيل العرض؟", "سيتوقف الخصم فورًا عن كل منتجاته (يمكن إعادة التفعيل).", "تعطيل", true);
+          if (!ok) return;
+        }
+        b.disabled = true;
+        try {
+          await api("/admin/promotions/" + encodeURIComponent(b.dataset.prToggle) + (enable ? "/enable" : "/disable"), { method: "POST", body: {} });
+          toast(enable ? "✅ تم تفعيل العرض" : "⏸️ تم تعطيل العرض");
+          pagePromotions();
+        } catch (ex) { toast(ex.message || "تعذر الحفظ", true); b.disabled = false; }
+      }));
+      view.querySelectorAll("[data-pr-del]").forEach((b) => b.addEventListener("click", async () => {
+        const ok = await confirmDlg("حذف العرض؟", "«" + b.dataset.name + "» — المستخدم في طلبات سابقة يُعطَّل بدل الحذف للحفاظ على الفواتير.", "حذف", true);
+        if (!ok) return;
+        try {
+          const r = await api("/admin/promotions/" + encodeURIComponent(b.dataset.prDel), { method: "DELETE" });
+          toast(r.deleted ? "🗑️ تم حذف العرض" : "⏸️ العرض مستخدم في طلبات — تم تعطيله للحفاظ على الفواتير");
+          pagePromotions();
+        } catch (ex) { toast(ex.message || "تعذر الحذف", true); }
+      }));
+    } catch (ex) {
+      document.getElementById("prList").innerHTML = stateHTML("⚠️", "حدث خطأ أثناء تحميل العروض", ex.message || "", '<button type="button" class="ad-btn ad-btn-primary" id="retryBtn">إعادة المحاولة</button>');
+      document.getElementById("retryBtn").addEventListener("click", () => pagePromotions());
+    }
+  }
+
+  async function pagePromoForm(id) {
+    const isNew = !id;
+    setChrome("promotions");
+    document.title = (isNew ? "عرض جديد" : "تعديل عرض") + " | لوحة التحكم";
+    view.innerHTML = '<a class="ad-back" data-link href="/admin/promotions">→ رجوع للعروض</a><div class="ad-card">' + skel(2) + "</div>";
+    let pr = null;
+    try {
+      if (!isNew) {
+        pr = await api("/admin/promotions/" + encodeURIComponent(id));
+        if (!pr) throw { message: "العرض غير موجود." };
+      }
+      renderPromoForm();
+    } catch (ex) {
+      view.innerHTML = '<a class="ad-back" data-link href="/admin/promotions">→ رجوع للعروض</a>' +
+        stateHTML("⚠️", "تعذر تحميل العرض", ex.message || "");
+      return;
+    }
+
+    function renderPromoForm() {
+      const v = (k, d) => (pr && pr[k] !== null && pr[k] !== undefined ? pr[k] : (d === undefined ? "" : d));
+      const selected = new Set((pr && pr.products ? pr.products : []).map((x) => x.id));
+      view.innerHTML =
+        '<a class="ad-back" data-link href="/admin/promotions">→ رجوع للعروض</a>' +
+        '<div class="ad-page-head"><div><h1>' + (isNew ? "＋ عرض جديد" : "✏️ تعديل: " + esc(pr.name)) + "</h1></div></div>" +
+        '<form class="ad-card ad-form" id="prForm" novalidate>' +
+        '<div class="ad-form-error" id="prErr" role="alert"></div>' +
+        '<div class="ad-field"><label for="pfName">اسم العرض <i>*</i></label><input id="pfName" value="' + esc(v("name")) + '" placeholder="مثال: خصم نهاية الأسبوع" /><span class="err"></span></div>' +
+        '<div class="ad-field"><label for="pfDesc">الوصف (يظهر للعملاء)</label><textarea id="pfDesc" placeholder="تفاصيل العرض...">' + esc(v("description", "")) + "</textarea></div>" +
+        '<div class="ad-form-2">' +
+        '<div class="ad-field"><label for="pfType">نوع العرض <i>*</i></label><select id="pfType">' +
+          PROMO_TYPES.map(([tv, l]) => '<option value="' + tv + '"' + (v("type", "percentage") === tv ? " selected" : "") + ">" + l + "</option>").join("") +
+        "</select></div>" +
+        '<div class="ad-field" id="pfValWrap"><label for="pfVal" id="pfValLabel">قيمة الخصم <i>*</i></label>' +
+          '<input id="pfVal" type="number" min="0" step="0.5" dir="ltr" value="' + esc(v("type") === "fixed_price" ? v("fixedPrice", "") : v("discountValue", "")) + '" /><span class="err"></span></div>' +
+        "</div>" +
+        '<div class="ad-form-2">' +
+        '<div class="ad-field"><label for="pfStart">البداية (فارغ = فورًا)</label><input id="pfStart" type="datetime-local" dir="ltr" value="' + utcToLocalInput(v("startAt", null)) + '" /></div>' +
+        '<div class="ad-field"><label for="pfEnd">النهاية (فارغ = بدون نهاية)</label><input id="pfEnd" type="datetime-local" dir="ltr" value="' + utcToLocalInput(v("endAt", null)) + '" /><span class="err"></span></div>' +
+        "</div>" +
+        '<div class="ad-form-2">' +
+        '<div class="ad-field"><label for="pfPrio">الأولوية (الأعلى يفوز عند التداخل)</label><input id="pfPrio" type="number" min="0" max="1000" step="1" dir="ltr" value="' + esc(v("priority", 0)) + '" /></div>' +
+        '<div class="ad-field"><label>الحالة</label>' + toggleRow("pfEnabled", "العرض مفعّل", "التعطيل يوقف الخصم فورًا.", isNew || v("enabled", true)) + "</div>" +
+        "</div>" +
+        '<div class="ad-field"><label>منتجات العرض <i>*</i> (<span id="pfCount">' + selected.size + "</span> محدد)</label>" +
+        '<div class="ad-search" style="margin-bottom:.5rem"><span aria-hidden="true">🔎</span><input id="pfSearch" placeholder="ابحث باسم المنتج..." /></div>' +
+        '<div class="ad-picklist" id="pfList"><div class="ad-skel"></div></div><span class="err" id="pfProdErr"></span></div>' +
+        '<button type="submit" class="ad-btn ad-btn-primary ad-btn-block" id="prSave">💾 ' + (isNew ? "إنشاء العرض" : "حفظ التعديلات") + "</button>" +
+        "</form>";
+
+      const typeSel = document.getElementById("pfType");
+      const valInput = document.getElementById("pfVal");
+      const valLabel = document.getElementById("pfValLabel");
+      const syncVal = () => {
+        const t = typeSel.value;
+        valLabel.innerHTML = t === "percentage" ? "نسبة الخصم % (1-99) <i>*</i>"
+          : t === "fixed_discount" ? "قيمة الخصم بالجنيه <i>*</i>" : "سعر البيع الثابت بالجنيه <i>*</i>";
+      };
+      typeSel.addEventListener("change", syncVal);
+      syncVal();
+
+      // منتقي المنتجات — بحث لحظي + تحديد متعدد
+      const listBox = document.getElementById("pfList");
+      const countEl = document.getElementById("pfCount");
+      let timer = null;
+      async function loadProducts(search) {
+        try {
+          const q = new URLSearchParams({ limit: "100" });
+          if (search) q.set("search", search);
+          const d = await api("/admin/products?" + q);
+          const rows = d.products || [];
+          listBox.innerHTML = rows.length ? rows.map((p) =>
+            '<label class="ad-pick' + (selected.has(p.id) ? " is-on" : "") + '">' +
+            '<input type="checkbox" data-pick-prod="' + esc(p.id) + '"' + (selected.has(p.id) ? " checked" : "") +
+              (p.available ? "" : " disabled") + " />" +
+            '<span class="ad-product-emoji" aria-hidden="true">' + productImage(p) + "</span>" +
+            "<span><b>" + esc(p.name) + "</b> <small>" + fmtPrice(p.price) + (p.available ? "" : " — موقوف") + "</small></span>" +
+            "</label>").join("") : '<p style="color:var(--muted);font-size:.88rem">لا توجد منتجات مطابقة.</p>';
+          listBox.querySelectorAll("[data-pick-prod]").forEach((c) => c.addEventListener("change", () => {
+            if (c.checked) selected.add(c.dataset.pickProd); else selected.delete(c.dataset.pickProd);
+            c.closest(".ad-pick").classList.toggle("is-on", c.checked);
+            countEl.textContent = selected.size;
+          }));
+        } catch (ex) {
+          listBox.innerHTML = '<p style="color:var(--muted);font-size:.88rem">تعذر تحميل المنتجات.</p>';
+        }
+      }
+      loadProducts("");
+      document.getElementById("pfSearch").addEventListener("input", (e) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => loadProducts(e.target.value.trim()), 350);
+      });
+
+      document.getElementById("prForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        view.querySelectorAll(".ad-field.invalid").forEach((w) => w.classList.remove("invalid"));
+        const err = document.getElementById("prErr");
+        err.classList.remove("show");
+        const fail = (input, msg) => {
+          const w = input.closest(".ad-field");
+          w.classList.add("invalid");
+          const s = w.querySelector(".err"); if (s) s.textContent = msg;
+        };
+        const name = document.getElementById("pfName").value.trim();
+        const val = Number(valInput.value);
+        const prio = Number(document.getElementById("pfPrio").value);
+        const start = document.getElementById("pfStart").value || null;
+        const end = document.getElementById("pfEnd").value || null;
+        let bad = false;
+        if (name.length < 2) { fail(document.getElementById("pfName"), "اسم العرض مطلوب."); bad = true; }
+        if (typeSel.value === "percentage" && (!Number.isFinite(val) || val <= 0 || val >= 100)) { fail(valInput, "النسبة بين 1 و 99."); bad = true; }
+        if (typeSel.value !== "percentage" && (!Number.isFinite(val) || val <= 0)) { fail(valInput, "أدخل قيمة صحيحة أكبر من صفر."); bad = true; }
+        if (document.getElementById("pfPrio").value !== "" && (!Number.isInteger(prio) || prio < 0 || prio > 1000)) { fail(document.getElementById("pfPrio"), "الأولوية من 0 إلى 1000."); bad = true; }
+        if (start && end && end <= start) { fail(document.getElementById("pfEnd"), "النهاية يجب أن تكون بعد البداية."); bad = true; }
+        if (!selected.size) { document.getElementById("pfProdErr").textContent = "اختر منتجًا واحدًا على الأقل."; bad = true; }
+        if (bad) return;
+
+        const body = {
+          name, description: document.getElementById("pfDesc").value.trim(),
+          type: typeSel.value,
+          discountValue: typeSel.value === "fixed_price" ? undefined : val,
+          fixedPrice: typeSel.value === "fixed_price" ? val : undefined,
+          priority: document.getElementById("pfPrio").value === "" ? 0 : prio,
+          enabled: document.getElementById("pfEnabled").checked,
+          startAt: start, endAt: end,
+          productIds: [...selected],
+        };
+        const btn = document.getElementById("prSave");
+        btn.disabled = true;
+        btn.innerHTML = '<span class="ad-spinner"></span> جاري الحفظ...';
+        try {
+          if (isNew) await api("/admin/promotions", { method: "POST", body });
+          else await api("/admin/promotions/" + encodeURIComponent(id), { method: "PATCH", body });
+          toast(isNew ? "✅ تم إنشاء العرض" : "✅ تم حفظ العرض");
+          navigate("/admin/promotions");
+        } catch (ex) {
+          err.textContent = ex.message || "تعذر الحفظ.";
+          err.classList.add("show");
+          btn.disabled = false;
+          btn.textContent = isNew ? "💾 إنشاء العرض" : "💾 حفظ التعديلات";
+        }
+      });
+    } // renderPromoForm
+  }
+
   /* ================= التوجيه ================= */
 
   function render() {
@@ -1311,6 +1578,9 @@
     if ((m = path.match(/^\/admin\/customers\/(.+)$/))) return void pageCustomerDetails(decodeURIComponent(m[1]));
     if (path === "/admin/settings") return void pageSettings();
     if (path === "/admin/delivery") return void pageDelivery();
+    if (path === "/admin/promotions") return void pagePromotions();
+    if (path === "/admin/promotions/new") return void pagePromoForm(null);
+    if ((m = path.match(/^\/admin\/promotions\/(.+)\/edit$/))) return void pagePromoForm(decodeURIComponent(m[1]));
     setChrome("dashboard");
     view.innerHTML = stateHTML("🔍", "الصفحة غير موجودة", "تأكد من الرابط وحاول مجددًا.", '<a class="ad-btn ad-btn-primary" data-link href="/admin/">الرئيسية</a>');
   }

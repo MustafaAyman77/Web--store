@@ -9,6 +9,11 @@ import {
   customerUpdate, storeSettings, storeSettingsUpdate,
   zonesList, zoneCreate, zoneUpdate, zoneDelete,
 } from "../controllers/admin.controller.js";
+import {
+  adminList as promosList, adminGet as promoGet, adminCreate as promoCreate,
+  adminUpdate as promoUpdate, adminEnable as promoEnable, adminDisable as promoDisable,
+  adminDelete as promoDelete,
+} from "../controllers/promotions.controller.js";
 
 const router = Router();
 
@@ -41,5 +46,12 @@ router.get("/delivery-zones", requireAdmin, asyncHandler(zonesList));
 router.post("/delivery-zones", requireAdmin, asyncHandler(zoneCreate));
 router.patch("/delivery-zones/:id", requireAdmin, asyncHandler(zoneUpdate));
 router.delete("/delivery-zones/:id", requireAdmin, asyncHandler(zoneDelete));
+router.get("/promotions", requireAdmin, asyncHandler(promosList));
+router.get("/promotions/:id", requireAdmin, asyncHandler(promoGet));
+router.post("/promotions", requireAdmin, asyncHandler(promoCreate));
+router.patch("/promotions/:id", requireAdmin, asyncHandler(promoUpdate));
+router.post("/promotions/:id/enable", requireAdmin, asyncHandler(promoEnable));
+router.post("/promotions/:id/disable", requireAdmin, asyncHandler(promoDisable));
+router.delete("/promotions/:id", requireAdmin, asyncHandler(promoDelete));
 
 export default router;

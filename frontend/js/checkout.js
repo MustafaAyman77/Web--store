@@ -66,10 +66,11 @@
     wrap.innerHTML =
       "<h3>🧾 ملخص طلبك</h3>" +
       '<div class="co-lines">' + rows + "</div>" +
-      '<div class="total-row"><span>🛒 إجمالي المنتجات</span><output>' + UI.fmtPrice(Cart.subtotal()) + "</output></div>" +
+      '<div class="total-row"><span>🛒 إجمالي المنتجات</span><output id="coSubVal">' + UI.fmtPrice(Cart.subtotal()) + "</output></div>" +
       (Cart.savings() > 0
-        ? '<div class="total-row is-save"><span>🎉 التوفير</span><output>' + UI.fmtPrice(Cart.savings()) + "</output></div>"
+        ? '<div class="total-row is-save" id="coSaveRow"><span>🎉 التوفير</span><output id="coSaveVal">' + UI.fmtPrice(Cart.savings()) + "</output></div>"
         : "") +
+      '<div class="total-row is-save" id="coDiscRow" hidden><span>🎉 خصم العروض</span><output id="coDiscVal">—</output></div>' +
       '<div class="total-row"><span id="coShipLabel">🚚 التوصيل</span><output id="coShipVal" class="pending">—</output></div>' +
       '<div class="total-row grand"><span>الإجمالي</span><output id="coGrandVal">' + UI.fmtPrice(Cart.total()) + "</output></div>" +
       '<button type="button" class="btn btn-outline btn-block" data-edit-cart>🛠️ تعديل السلة</button>';
@@ -100,6 +101,23 @@
         }
         shipVal.classList.remove("pending");
         grandVal.textContent = UI.fmtPrice(q.total);
+        // حقيقة السيرفر: إجمالي المنتجات + خصم العروض بعد إعادة الحساب
+        const subVal = document.getElementById("coSubVal");
+        if (subVal && q.subtotal !== undefined) subVal.textContent = UI.fmtPrice(q.subtotal);
+        const discRow = document.getElementById("coDiscRow");
+        const discVal = document.getElementById("coDiscVal");
+        if (discRow && discVal) {
+          if (q.discountTotal > 0) {
+            discRow.hidden = false;
+            discVal.textContent = UI.fmtPrice(q.discountTotal);
+            const saveRow = document.getElementById("coSaveRow");
+            if (saveRow) saveRow.hidden = true; // منع الازدواج — رقم السيرفر هو المعتمد
+          } else {
+            discRow.hidden = true;
+            const saveRow = document.getElementById("coSaveRow");
+            if (saveRow) saveRow.hidden = false;
+          }
+        }
       } catch (e) {
         quoteCache = null;
         if (fulfillment === "pickup") {

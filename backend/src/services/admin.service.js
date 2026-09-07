@@ -6,6 +6,7 @@ import { getDb } from "../database/database.js";
 import { ApiError } from "../utils/api-error.js";
 import { logAudit } from "../utils/audit.js";
 import { toPublicProduct } from "../controllers/products.controller.js";
+import { resolvePromosForProducts } from "./promotion.service.js";
 import { allowedNext, ORDER_STATUSES, getOrderByIdOrNumber } from "./order.service.js";
 import { categoryExists } from "./category.service.js";
 import { getPurchaseHistory } from "./customer-history.service.js";
@@ -82,7 +83,18 @@ export function getDashboard() {
     outOfStockCount: outRow.n || 0,
     restockCount: (lowCount.n || 0) + (outRow.n || 0),
     ...storeCards(db),
+    ...promoCards(db),
   };
+}
+
+function promoCards(db) {
+  try {
+    const active = db.prepare("SELECT COUNT(*) AS n FROM promotions p WHERE p.enabled = 1 AND (p.start_at IS NULL OR p.start_at <= datetime('now')) AND (p.end_at IS NULL OR p.end_at > datetime('now'));").get();
+    const expiring = db.prepare("SELECT id, name, end_at AS endsAt FROM promotions p WHERE p.enabled = 1 AND p.end_at IS NOT NULL AND p.end_at > datetime('now') ORDER BY p.end_at ASC LIMIT 3;").all();
+    return { activePromotions: active?.n || 0, expiringPromotions: expiring || [] };
+  } catch {
+    return {};
+  }
 }
 
 function storeCards(db) {
@@ -256,7 +268,8 @@ export function listProductsAdmin({ search, category, available, status, sort, p
     .prepare(`SELECT * FROM products ${where} ORDER BY ${orderBy} LIMIT ? OFFSET ?;`)
     .all(...vals, lim, offset);
   const totalRow = db.prepare(`SELECT COUNT(*) AS count FROM products ${where};`).get(...vals);
-  return { products: rows.map(toPublicProduct), total: totalRow.count, limit: lim, offset, page: p };
+  const promoMap = resolvePromosForProducts(db, rows.map((r) => r.id));
+  return { products: rows.map((r) => toPublicProduct(r, promoMap)), total: totalRow.count, limit: lim, offset, page: p };
 }
 
 const cleanStr = (v, max) => String(v ?? "").trim().slice(0, max);

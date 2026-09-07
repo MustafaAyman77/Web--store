@@ -31,6 +31,7 @@ import authRoutes from "./routes/auth.routes.js";
 import meRoutes from "./routes/me.routes.js";
 import notificationsRoutes from "./routes/notifications.routes.js";
 import storeRoutes from "./routes/store.routes.js";
+import promotionsRoutes from "./routes/promotions.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -81,6 +82,7 @@ export function createApp() {
   app.use("/api/me", attachCustomer, meRoutes);
   app.use("/api/notifications", attachCustomer, notificationsRoutes);
   app.use("/api", storeRoutes);
+  app.use("/api/promotions", promotionsRoutes);
   app.use("/api/admin", adminRoutes);
 
   // ---------- لوحة التحكم (SPA — كل مسارات /admin تخدم index.html) ----------

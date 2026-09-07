@@ -133,6 +133,31 @@ CREATE TABLE IF NOT EXISTS delivery_zones (
 );
 CREATE INDEX IF NOT EXISTS idx_zones_enabled ON delivery_zones(enabled);
 
+-- العروض الترويجية (المرحلة 12)
+CREATE TABLE IF NOT EXISTS promotions (
+  id            TEXT PRIMARY KEY,
+  name          TEXT NOT NULL,
+  description   TEXT NOT NULL DEFAULT '',
+  type          TEXT NOT NULL, -- percentage | fixed_discount | fixed_price
+  discount_value REAL NOT NULL DEFAULT 0,
+  fixed_price   REAL,
+  start_at      TEXT, -- UTC 'YYYY-MM-DD HH:MM:SS' أو NULL = فورًا
+  end_at        TEXT, -- UTC أو NULL = بدون نهاية
+  enabled       INTEGER NOT NULL DEFAULT 1,
+  priority      INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS promotion_products (
+  id            TEXT PRIMARY KEY,
+  promotion_id  TEXT NOT NULL REFERENCES promotions(id) ON DELETE CASCADE,
+  product_id    TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (promotion_id, product_id)
+);
+CREATE INDEX IF NOT EXISTS idx_pp_promo ON promotion_products(promotion_id);
+CREATE INDEX IF NOT EXISTS idx_pp_product ON promotion_products(product_id);
+
 CREATE TABLE IF NOT EXISTS orders (
   id               TEXT PRIMARY KEY,         -- UUID داخلي
   order_number     TEXT NOT NULL UNIQUE,     -- BS-YYYYMMDD-NNNN للعميل
@@ -162,8 +187,13 @@ CREATE TABLE IF NOT EXISTS order_items (
   product_id   TEXT NOT NULL,
   product_name TEXT NOT NULL,                -- نسخة وقت الشراء
   quantity     INTEGER NOT NULL CHECK (quantity > 0),
-  price        REAL NOT NULL,                -- سعر الوحدة وقت الشراء
-  subtotal     REAL NOT NULL
+  price        REAL NOT NULL,                -- سعر الوحدة وقت الشراء (النهائي بعد العرض)
+  subtotal     REAL NOT NULL,
+  original_price REAL,                      -- السعر الأصلي قبل العرض (لقطة)
+  final_price    REAL,                      -- = price (وضوح اللقطة)
+  discount_amount REAL NOT NULL DEFAULT 0,  -- الفرق للوحدة الواحدة
+  promotion_id   TEXT,                      -- لقطة العرض المطبق (قد يُحذف لاحقًا)
+  promotion_name TEXT DEFAULT ''            -- اسم العرض وقت الشراء
 );
 CREATE INDEX IF NOT EXISTS idx_items_order ON order_items(order_id);
 

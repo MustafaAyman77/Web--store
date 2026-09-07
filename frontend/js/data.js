@@ -97,8 +97,10 @@
   }
 
   function hasDiscount(p) {
-    return !!(p && p.oldPrice && Number(p.oldPrice) > Number(p.price)) ||
-      !!(p && p.badge && p.badge.tone === "offer");
+    if (!p) return false;
+    if (p.promotion && p.promotion.id) return true; // عرض حقيقي من الباك-إند
+    return !!(p.oldPrice && Number(p.oldPrice) > Number(p.price)) ||
+      !!(p.badge && p.badge.tone === "offer");
   }
 
   /* ---------------- دوال الوصول للبيانات ---------------- */

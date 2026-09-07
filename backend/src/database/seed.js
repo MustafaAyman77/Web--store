@@ -12,8 +12,14 @@ const STOCK_DEFAULT = 100; // مخزون تجريبي سخي حتى لا يعي�
 
 function seedProducts(db, force) {
   if (force) {
+    // ترتيب آمن للمفاتيح الأجنبية: التوابع أولًا ثم الأصول
+    db.exec("DELETE FROM notifications;");
+    db.exec("DELETE FROM order_status_history;");
+    db.exec("DELETE FROM inventory_movements;");
     db.exec("DELETE FROM order_items;");
     db.exec("DELETE FROM orders;");
+    db.exec("DELETE FROM promotion_products;");
+    db.exec("DELETE FROM promotions;");
     db.exec("DELETE FROM products;");
   }
   const { count } = db.prepare("SELECT COUNT(*) AS count FROM products;").get();

@@ -151,6 +151,25 @@ function migrate(database) {
   if (!orderCols11.includes("delivery_zone_name")) database.exec("ALTER TABLE orders ADD COLUMN delivery_zone_name TEXT DEFAULT '';");
   seedStoreSettings(database);
   seedDeliveryZones(database);
+  // --- المرحلة 12: العروض + لقطة الأسعار في الأصناف ---
+  database.exec(`CREATE TABLE IF NOT EXISTS promotions (
+    id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '',
+    type TEXT NOT NULL, discount_value REAL NOT NULL DEFAULT 0, fixed_price REAL,
+    start_at TEXT, end_at TEXT, enabled INTEGER NOT NULL DEFAULT 1,
+    priority INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')), updated_at TEXT NOT NULL DEFAULT (datetime('now')));`);
+  database.exec(`CREATE TABLE IF NOT EXISTS promotion_products (
+    id TEXT PRIMARY KEY, promotion_id TEXT NOT NULL REFERENCES promotions(id) ON DELETE CASCADE,
+    product_id TEXT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE (promotion_id, product_id));`);
+  database.exec("CREATE INDEX IF NOT EXISTS idx_pp_promo ON promotion_products(promotion_id);");
+  database.exec("CREATE INDEX IF NOT EXISTS idx_pp_product ON promotion_products(product_id);");
+  const itemCols = database.prepare("PRAGMA table_info(order_items);").all().map((c) => c.name);
+  if (!itemCols.includes("original_price")) database.exec("ALTER TABLE order_items ADD COLUMN original_price REAL;");
+  if (!itemCols.includes("final_price")) database.exec("ALTER TABLE order_items ADD COLUMN final_price REAL;");
+  if (!itemCols.includes("discount_amount")) database.exec("ALTER TABLE order_items ADD COLUMN discount_amount REAL NOT NULL DEFAULT 0;");
+  if (!itemCols.includes("promotion_id")) database.exec("ALTER TABLE order_items ADD COLUMN promotion_id TEXT;");
+  if (!itemCols.includes("promotion_name")) database.exec("ALTER TABLE order_items ADD COLUMN promotion_name TEXT DEFAULT '';");
   const adminCols = database.prepare("PRAGMA table_info(admins);").all().map((c) => c.name);
   if (!adminCols.includes("role")) {
     database.exec("ALTER TABLE admins ADD COLUMN role TEXT NOT NULL DEFAULT 'owner';");

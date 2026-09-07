@@ -67,7 +67,7 @@ export function getMyOrderDetails(customerId, orderNumber) {
     .get(ref, customerId);
   if (!order) throw ApiError.notFound("ORDER_NOT_FOUND", "الطلب غير موجود.");
   const items = db
-    .prepare("SELECT product_id AS productId, product_name AS name, quantity, price, subtotal FROM order_items WHERE order_id = ?;")
+    .prepare("SELECT product_id AS productId, product_name AS name, quantity, price, subtotal, original_price AS originalPrice, discount_amount AS discountAmount, promotion_name AS promotionName FROM order_items WHERE order_id = ?;")
     .all(order.id);
   return {
     orderNumber: order.order_number,

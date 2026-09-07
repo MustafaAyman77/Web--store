@@ -29,6 +29,7 @@
         if (global.Basit.Account) global.Basit.Account.init();
         if (global.Basit.Track) global.Basit.Track.init();
         if (global.Basit.Notif) global.Basit.Notif.init();
+        if (global.Basit.Offers) global.Basit.Offers.init();
       } catch (err) {
         // لا نكسر الصفحة أبدًا — نسجل الخطأ فقط
         if (global.console && console.error) console.error("[Basit] init failed:", err);

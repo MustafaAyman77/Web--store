@@ -56,7 +56,12 @@
     const res = await fetch(base() + "/api/recommendations?" + q);
     if (!res.ok) return null;
     const data = await res.json();
-    return data && data.data ? data.data : null;
+    const d = data && data.data ? data.data : null;
+    // توحيد الشكل مع mapProduct: السعر النهائي + الشارة + العد التنازلي
+    if (d && Array.isArray(d.recommendations) && Api.mapProduct) {
+      d.recommendations = d.recommendations.map((r) => ({ ...Api.mapProduct(r), reason: r.reason, score: r.score }));
+    }
+    return d;
   }
 
   /** تحميل "اشتريته قبل كده" قبل أول رسم — يُستدعى من boot */

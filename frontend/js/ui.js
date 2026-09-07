@@ -62,12 +62,19 @@
     const cat = Data.getCategory(p.category);
     const available = p.available !== false;
     const outOfStock = p.outOfStock === true;
+    const hasPromo = !!(p.promotion && p.promotion.id);
+    const promoOff = hasPromo ? (p.discountPercent || Data.discountPercent(p.oldPrice, p.price)) : 0;
     const tag = outOfStock
       ? '<span class="product-tag is-off">🔴 نفد المخزون</span>'
       : !available
         ? '<span class="product-tag is-off">غير متوفر</span>'
-        : (p.badge ? '<span class="' + badgeClass(p.badge.tone) + '">' + esc(p.badge.text) + "</span>"
-          : (p.isNew ? '<span class="product-tag is-new">🆕 جديد</span>' : ""));
+        : hasPromo
+          ? '<span class="product-tag is-promo" title="' + esc(p.promotion.name || "") + '">🔥 خصم ' + promoOff + "%</span>"
+          : (p.badge ? '<span class="' + badgeClass(p.badge.tone) + '">' + esc(p.badge.text) + "</span>"
+            : (p.isNew ? '<span class="product-tag is-new">🆕 جديد</span>' : ""));
+    const promoCount = hasPromo && p.promotion.endsAt
+      ? '<p class="promo-count" data-countdown="' + esc(p.promotion.endsAt) + '"></p>'
+      : "";
     const boughtLine = (available && global.Basit.Recs && global.Basit.Recs.isBought(p.id))
       ? '<p class="bought-before">❤️ اشتريته قبل كده</p>'
       : "";
@@ -92,6 +99,8 @@
           '<span class="product-cat">' + esc(cat ? cat.name : "") + "</span>" +
           '<button type="button" class="p-open product-name" data-product="' + esc(p.id) + '">' + esc(p.name) + "</button>" +
           '<p class="product-desc">' + esc(p.desc || "") + "</p>" +
+          (hasPromo && p.promotion.name ? '<p class="promo-name">🎉 ' + esc(p.promotion.name) + "</p>" : "") +
+          promoCount +
           boughtLine +
           '<div class="product-foot">' +
             '<div class="price-row"><span class="price">' + fmtPrice(p.price) + "</span>" + old +
@@ -166,31 +175,73 @@
 
   /* ================= بناء العروض ================= */
 
+  function bundleOfferCardHTML(o) {
+    const off = Data.discountPercent(o.oldPrice, o.newPrice);
+    const itemsHtml = o.items.map((it) => "<li>" + esc(it) + "</li>").join("");
+    return (
+      '<article class="offer-card">' +
+        '<span class="offer-off">خصم ' + off + "%</span>" +
+        '<div class="offer-top">' +
+          '<span class="offer-emoji" aria-hidden="true">' + esc(o.icon) + "</span>" +
+          "<div><h3>" + esc(o.name) + "</h3><small>" + esc(o.sub) + "</small></div>" +
+        "</div>" +
+        '<div class="offer-body">' +
+          '<ul class="offer-items">' + itemsHtml + "</ul>" +
+          '<div class="offer-prices"><span class="offer-new">' + fmtPrice(o.newPrice) + "</span>" +
+          '<span class="offer-old">' + fmtPrice(o.oldPrice) + "</span></div>" +
+          '<button type="button" class="btn btn-accent btn-block" data-add-offer="' + esc(o.id) + '" aria-label="أضف ' + esc(o.name) + ' للسلة">' +
+            "🛒 أضف العرض للسلة" +
+          "</button>" +
+        "</div>" +
+      "</article>"
+    );
+  }
+
+  /** بطاقة عرض حقيقي — منتجاته تُضاف فرادى بأسعار الباك النهائية */
+  function realOfferCardHTML(promo, products) {
+    const P = global.Basit.Promos;
+    const plist = (products || []).slice(0, 4);
+    const rows = plist.map((p) =>
+      '<li class="ro-prod"><button type="button" class="p-open ro-name" data-product="' + esc(p.id) + '">' + esc(p.name) + "</button>" +
+      '<span class="ro-price">' + fmtPrice(p.price) +
+      (p.oldPrice && p.oldPrice > p.price ? ' <s>' + fmtPrice(p.oldPrice) + "</s>" : "") + "</span>" +
+      '<button type="button" class="add-btn ro-add" data-add-product="' + esc(p.id) + '" aria-label="أضف ' + esc(p.name) + '">＋</button></li>'
+    ).join("");
+    return (
+      '<article class="offer-card is-real">' +
+        '<span class="offer-off">🔥 ' + esc(P.valueText(promo)) + "</span>" +
+        '<div class="offer-top">' +
+          '<span class="offer-emoji" aria-hidden="true">🎉</span>' +
+          "<div><h3>" + esc(promo.name) + "</h3><small>" + esc(promo.description || ("على " + (promo.productCount || plist.length) + " منتجات")) + "</small></div>" +
+        "</div>" +
+        '<div class="offer-body">' +
+          (promo.endAt ? '<p class="promo-count promo-count-lg" data-countdown="' + esc(promo.endAt) + '"></p>' : "") +
+          '<ul class="offer-items ro-list">' + (rows || "<li>تصفح المنتجات لاكتشاف التخفيضات.</li>") + "</ul>" +
+          '<a class="btn btn-accent btn-block" href="offers.html">شاهد كل منتجات العرض ←</a>' +
+        "</div>" +
+      "</article>"
+    );
+  }
+
   function renderOffers() {
     const grid = $("#offerGrid");
     if (!grid) return;
-    grid.innerHTML = Data.offers.map((o) => {
-      const off = Data.discountPercent(o.oldPrice, o.newPrice);
-      const itemsHtml = o.items.map((it) => "<li>" + esc(it) + "</li>").join("");
-      return (
-        '<article class="offer-card">' +
-          '<span class="offer-off">خصم ' + off + "%</span>" +
-          '<div class="offer-top">' +
-            '<span class="offer-emoji" aria-hidden="true">' + esc(o.icon) + "</span>" +
-            "<div><h3>" + esc(o.name) + "</h3><small>" + esc(o.sub) + "</small></div>" +
-          "</div>" +
-          '<div class="offer-body">' +
-            '<ul class="offer-items">' + itemsHtml + "</ul>" +
-            '<div class="offer-prices"><span class="offer-new">' + fmtPrice(o.newPrice) + "</span>" +
-            '<span class="offer-old">' + fmtPrice(o.oldPrice) + "</span></div>" +
-            '<button type="button" class="btn btn-accent btn-block" data-add-offer="' + esc(o.id) + '" aria-label="أضف ' + esc(o.name) + ' للسلة">' +
-              "🛒 أضف العرض للسلة" +
-            "</button>" +
-          "</div>" +
-        "</article>"
-      );
-    }).join("");
+    // فوري: الباقات التجريبية (أوفلاين) — ثم ترقية صامتة للعروض الحقيقية
+    grid.innerHTML = Data.offers.map(bundleOfferCardHTML).join("");
+    try {
+      if (global.Basit.Promos) {
+        global.Basit.Promos.ensure().then((promos) => {
+          if (!promos || !promos.length || !document.getElementById("offerGrid")) return;
+          const groups = global.Basit.Promos.groupProducts(Data.products);
+          document.getElementById("offerGrid").innerHTML =
+            promos.slice(0, 3).map((pr) => realOfferCardHTML(pr, groups[pr.id] || [])).join("") +
+            (promos.length > 3 ? '<p class="offers-more"><a class="btn btn-outline" href="offers.html">عرض كل العروض (' + promos.length + ") ←</a></p>" : "");
+          global.Basit.Promos.tick();
+        }).catch(() => {});
+      }
+    } catch (e) { /* تبقى الباقات */ }
   }
+
 
   /* ================= نافذة تفاصيل المنتج ================= */
 
@@ -246,6 +297,11 @@
           "<h4>" + esc(p.name) + "</h4>" +
           '<p class="pd-desc">' + esc(p.desc || "") + "</p>" +
           '<div class="pd-prices"><span class="price price-lg">' + fmtPrice(p.price) + "</span>" + old + off + "</div>" +
+          (p.promotion && p.promotion.id
+            ? '<div class="pd-promo">🎉 <b>' + esc(p.promotion.name || "عرض خاص") + "</b>" +
+              (p.promotion.endsAt ? ' <span class="promo-count" data-countdown="' + esc(p.promotion.endsAt) + '"></span>' : "") +
+              "</div>"
+            : "") +
           '<p class="pd-stock ' + (available ? "in" : "out") + '">' +
             '<span aria-hidden="true">' + (p.outOfStock === true ? "🔴" : available ? "✅" : "⛔") + "</span> " +
             (p.outOfStock === true ? "نفد المخزون" : available ? ("متوفر" + (p.lowStockQty > 0 ? " — ⚠️ باقي " + p.lowStockQty + " فقط" : "")) : "غير متوفر") +
@@ -307,8 +363,12 @@
   function recCardHTML(p) {
     if (!p || !p.id) return "";
     const price = Number(p.price) || 0;
+    const hasPromo = !!(p.promotion && p.promotion.id);
     const old = p.oldPrice && Number(p.oldPrice) > price
       ? '<span class="price-old">' + fmtPrice(p.oldPrice) + "</span>" : "";
+    const promoTag = hasPromo
+      ? '<span class="product-tag is-promo is-mini">🔥 خصم ' + (p.discountPercent || Data.discountPercent(p.oldPrice, price)) + "%</span>"
+      : (p.isNew ? '<span class="product-tag is-new">🆕</span>' : "");
     const img = p.icon || p.image || "🛒";
     const visual = /^(https?:\/\/|\/|data:image)/.test(img)
       ? '<img src="' + esc(img) + '" alt="" loading="lazy" />'
@@ -317,7 +377,7 @@
     return (
       '<article class="rec-card">' +
         '<button type="button" class="p-open rec-visual" data-product="' + esc(p.id) + '" aria-label="عرض ' + esc(p.name) + '" style="--p1:' + esc(tint[0]) + ";--p2:" + esc(tint[1]) + '">' +
-          (p.isNew ? '<span class="product-tag is-new">🆕</span>' : "") +
+          promoTag +
           '<span class="p-icon" aria-hidden="true">' + visual + "</span>" +
         "</button>" +
         '<div class="rec-body">' +
@@ -458,7 +518,9 @@
       '<div class="cart-line" data-line="' + esc(l.key) + '">' +
         '<span class="cl-visual" style="--p1:' + esc(l.tint[0]) + ";--p2:" + esc(l.tint[1]) + '" aria-hidden="true">' + esc(l.icon) + "</span>" +
         '<div class="cl-info"><div class="cl-name">' + esc(l.name) + "</div>" +
-        '<div class="cl-price">' + fmtPrice(l.price) + (l.kind === "offer" ? " • عرض" : "") + "</div>" +
+        '<div class="cl-price">' + fmtPrice(l.price) +
+          (l.oldPrice && l.oldPrice > l.price ? ' <s class="cl-old">' + fmtPrice(l.oldPrice) + "</s>" : "") +
+          (l.kind === "offer" ? " • عرض" : "") + "</div>" +
         '<div class="cl-total">' + fmtPrice(l.price * l.qty) + "</div></div>" +
         '<div class="cl-side">' +
           '<div class="stepper">' +
@@ -786,6 +848,12 @@
     renderHomeProducts();
     renderOffers();
     renderHomeRecs();
+    try {
+      if (global.Basit.Promos) {
+        global.Basit.Promos.tick();
+        setInterval(() => global.Basit.Promos.tick(), 30000);
+      }
+    } catch (e) { /* تجاهل */ }
     updateBadges();
     bindCartEvents();
     bindScrollEffects();

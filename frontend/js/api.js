@@ -56,13 +56,20 @@
 
   /** تحويل صف المنتج من الـ API لشكل الواجهة الموحد */
   function mapProduct(p) {
+    const base = Number(p.price);
+    const hasPromo = !!(p.promotion && p.promotion.id);
+    const final = (p.finalPrice !== null && p.finalPrice !== undefined) ? Number(p.finalPrice) : base;
+    const legacyOld = (p.oldPrice !== null && p.oldPrice !== undefined) ? Number(p.oldPrice) : undefined;
     return {
       id: p.id,
       name: p.name,
       category: p.category,
       desc: p.description || "",
-      price: Number(p.price),
-      oldPrice: p.oldPrice !== null && p.oldPrice !== undefined ? Number(p.oldPrice) : undefined,
+      price: final, // سعر البيع = النهائي بعد العرض (حقيقة الباك-إند)
+      oldPrice: (hasPromo && final < base) ? base : legacyOld, // مشطوب + توفير تلقائي
+      finalPrice: final,
+      promotion: hasPromo ? { id: p.promotion.id, name: p.promotion.name, type: p.promotion.type, endsAt: p.promotion.endsAt || null } : null,
+      discountPercent: Number(p.discountPercent) || 0,
       unit: p.unit || "",
       icon: p.image || "🛒",
       tint: Array.isArray(p.tint) && p.tint.length === 2 ? p.tint : ["#f1f5f9", "#e2e8f0"],
@@ -156,12 +163,34 @@
     return { ok: true, mode: "demo", orderNo: global.Basit.Orders.generateOrderId() };
   }
 
+  /** العروض النشطة من الـ Backend — null بدون سيرفر (تُستخدم الباقات التجريبية) */
+  async function getPromotions() {
+    const mode = await resolveMode();
+    if (mode !== "backend") return null;
+    const res = await fetch(url("/api/promotions"));
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    return data && data.data ? data.data.promotions || [] : [];
+  }
+
+  async function getPromotion(id) {
+    const mode = await resolveMode();
+    if (mode !== "backend") return null;
+    const res = await fetch(url("/api/promotions/" + encodeURIComponent(id)));
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data && data.data ? data.data : null;
+  }
+
   global.Basit = global.Basit || {};
   global.Basit.Api = {
     resolveMode,
     checkHealth,
     getPublicConfig,
     getProducts,
+    getPromotions,
+    getPromotion,
+    mapProduct,
     submitOrder,
     resetModeCache() { modeCache = null; },
   };
