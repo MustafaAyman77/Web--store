@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="css/layout.css" />
   <link rel="stylesheet" href="css/components.css" />
   <link rel="stylesheet" href="css/sections.css" />
+  <link rel="stylesheet" href="css/shop.css" />
 </head>
 <body>
 
@@ -34,7 +35,7 @@
 
       <nav class="main-nav" aria-label="التنقل الرئيسي">
         <a href="#home" class="nav-link is-active">الرئيسية</a>
-        <a href="#products" class="nav-link">المنتجات</a>
+        <a href="products.html" class="nav-link">المنتجات</a>
         <a href="#offers" class="nav-link">العروض <i class="nav-fire" aria-hidden="true">🔥</i></a>
         <a href="#location" class="nav-link">المحل</a>
       </nav>
@@ -71,7 +72,7 @@
           <p class="hero-sub">أسواق البسيط — شارع الحجاز، مغاغة</p>
           <p class="hero-desc">سوبر ماركت قريب منك، تختار اللي محتاجه وتحطه في السلة في ثواني — من غير لف ولا تعب.</p>
           <div class="hero-cta">
-            <a class="btn btn-light btn-lg" href="#products">
+            <a class="btn btn-light btn-lg" href="products.html">
               <span aria-hidden="true">🛒</span> تصفح المنتجات
             </a>
             <a class="btn btn-accent btn-lg" href="#offers">
@@ -133,7 +134,7 @@
             <span class="kicker">الأقسام</span>
             <h2 id="categoriesTitle">تسوق حسب القسم</h2>
           </div>
-          <a class="link-more" href="#products">كل المنتجات <span aria-hidden="true">←</span></a>
+          <a class="link-more" href="products.html">كل المنتجات <span aria-hidden="true">←</span></a>
         </div>
         <div class="cat-grid" id="catGrid"><!-- يُبنى من js/data.js --></div>
       </div>
@@ -255,8 +256,8 @@
       </div>
       <nav class="footer-col" aria-label="روابط سريعة">
         <h4>روابط سريعة</h4>
-        <a href="#home">الرئيسية</a>
-        <a href="#products">المنتجات</a>
+        <a href="index.html">الرئيسية</a>
+        <a href="products.html">المنتجات</a>
         <a href="#offers">العروض</a>
         <button type="button" class="footer-link-btn" data-open-cart>السلة</button>
       </nav>
@@ -286,7 +287,7 @@
     <a href="#home" class="bn-item is-active" data-nav="home">
       <span class="bn-icon" aria-hidden="true">🏠</span><span class="bn-label">الرئيسية</span>
     </a>
-    <a href="#products" class="bn-item" data-nav="products">
+    <a href="products.html" class="bn-item" data-nav="products">
       <span class="bn-icon" aria-hidden="true">🛒</span><span class="bn-label">المنتجات</span>
     </a>
     <a href="#offers" class="bn-item" data-nav="offers">
@@ -304,7 +305,7 @@
   <div class="overlay" id="overlay" hidden></div>
   <aside class="cart-drawer" id="cartDrawer" role="dialog" aria-modal="true" aria-label="سلة المشتريات" hidden>
     <div class="drawer-head">
-      <h3>🛍️ سلة المشتريات <span class="drawer-count" id="drawerCount">(0)</span></h3>
+      <h3>سلة مشترياتك 🛍️ <span class="drawer-count" id="drawerCount">(0)</span></h3>
       <button type="button" class="icon-btn" id="cartCloseBtn" aria-label="إغلاق السلة">✕</button>
     </div>
     <div class="drawer-body" id="cartItems"></div>
@@ -319,6 +320,17 @@
         <button type="button" class="icon-btn" id="checkoutCloseBtn" aria-label="إغلاق نافذة تأكيد الطلب">✕</button>
       </div>
       <div class="modal-body" id="checkoutBody"></div>
+    </div>
+  </div>
+
+  <!-- ===================== Product details modal ===================== -->
+  <div class="modal product-modal" id="productModal" role="dialog" aria-modal="true" aria-label="تفاصيل المنتج" hidden>
+    <div class="modal-card">
+      <div class="modal-head">
+        <h3>🔎 تفاصيل المنتج</h3>
+        <button type="button" class="icon-btn" id="productCloseBtn" aria-label="إغلاق تفاصيل المنتج">✕</button>
+      </div>
+      <div class="modal-body" id="productBody"></div>
     </div>
   </div>
 

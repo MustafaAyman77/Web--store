@@ -1,7 +1,8 @@
 /* ==========================================================================
    أسواق البسيط — UI
-   كل ما يخص العرض والتفاعل: بناء الأقسام/المنتجات/العروض، السلة،
-   نافذة تأكيد الطلب، التنبيهات، والتنقل — مقسمة لدوال منظمة.
+   كل ما يخص العرض والتفاعل: بناء الأقسام/المنتجات/العروض، تفاصيل المنتج،
+   السلة، نافذة تأكيد الطلب، التنبيهات، والتنقل — مقسمة لدوال منظمة.
+   ملف مشترك بين الصفحة الرئيسية (index.html) وصفحة المنتجات (products.html).
    ========================================================================== */
 (function (global) {
   "use strict";
@@ -41,9 +42,62 @@
     setTimeout(() => el.remove(), 2500);
   }
 
-  /* ================= بناء الأقسام ================= */
+  /* ================= كارت المنتج الموحد ================= */
 
-  let activeCategory = "all";
+  const ADD_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" ' +
+    'stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+
+  function badgeClass(tone) {
+    if (tone === "hot") return "product-tag is-hot";
+    if (tone === "new") return "product-tag is-new";
+    return "product-tag";
+  }
+
+  /**
+   * HTML كارت المنتج — يُستخدم في الرئيسية وصفحة المنتجات والترشيحات.
+   * الصورة والاسم يفتحان نافذة التفاصيل.
+   */
+  function productCardHTML(p) {
+    if (!p || !p.id) return "";
+    const cat = Data.getCategory(p.category);
+    const available = p.available !== false;
+    const tag = !available
+      ? '<span class="product-tag is-off">غير متوفر</span>'
+      : (p.badge ? '<span class="' + badgeClass(p.badge.tone) + '">' + esc(p.badge.text) + "</span>" : "");
+    const old = p.oldPrice && p.oldPrice > p.price
+      ? '<span class="price-old">' + fmtPrice(p.oldPrice) + "</span>"
+      : "";
+    const tint = p.tint || ["#f1f5f9", "#e2e8f0"];
+    const action = available
+      ? '<button type="button" class="add-btn" data-add-product="' + esc(p.id) + '" aria-label="أضف ' + esc(p.name) + ' للسلة">' +
+        ADD_SVG + " أضف للسلة</button>"
+      : '<button type="button" class="add-btn is-disabled" disabled aria-label="' + esc(p.name) + ' غير متوفر حاليًا">غير متوفر حاليًا</button>';
+
+    return (
+      '<article class="product-card' + (available ? "" : " is-unavailable") + '">' +
+        '<button type="button" class="p-open product-visual" data-product="' + esc(p.id) + '" ' +
+          'aria-label="عرض تفاصيل ' + esc(p.name) + '" ' +
+          'style="--p1:' + esc(tint[0]) + ";--p2:" + esc(tint[1]) + '">' +
+          tag +
+          '<span class="p-icon" aria-hidden="true">' + esc(p.icon || "🛒") + "</span>" +
+        "</button>" +
+        '<div class="product-body">' +
+          '<span class="product-cat">' + esc(cat ? cat.name : "") + "</span>" +
+          '<button type="button" class="p-open product-name" data-product="' + esc(p.id) + '">' + esc(p.name) + "</button>" +
+          '<p class="product-desc">' + esc(p.desc || "") + "</p>" +
+          '<div class="product-foot">' +
+            '<div class="price-row"><span class="price">' + fmtPrice(p.price) + "</span>" + old +
+            (p.unit ? '<span class="price-unit">/ ' + esc(p.unit) + "</span>" : "") + "</div>" +
+            action +
+          "</div>" +
+        "</div>" +
+      "</article>"
+    );
+  }
+
+  /* ================= أقسام الرئيسية ================= */
+
+  let homeCategory = "all";
 
   function renderCategories() {
     const grid = $("#catGrid");
@@ -59,96 +113,47 @@
       );
     }).join("");
 
+    // الضغط على القسم → صفحة المنتجات مفلترة بهذا القسم
     grid.addEventListener("click", (e) => {
       const card = e.target.closest("[data-category]");
       if (!card) return;
-      setCategoryFilter(card.dataset.category, true);
+      window.location.href = "products.html?cat=" + encodeURIComponent(card.dataset.category);
     });
   }
 
-  /* ================= بناء فلاتر المنتجات ================= */
-
-  function renderFilters() {
+  function renderHomeFilters() {
     const row = $("#filterRow");
     if (!row) return;
     const chips = [{ id: "all", name: "الكل", icon: "🛍️" }].concat(Data.categories);
     row.innerHTML = chips.map((c) =>
-      '<button type="button" role="tab" class="chip' + (c.id === activeCategory ? " is-active" : "") +
-      '" data-filter="' + esc(c.id) + '" aria-selected="' + (c.id === activeCategory) + '">' +
+      '<button type="button" role="tab" class="chip' + (c.id === homeCategory ? " is-active" : "") +
+      '" data-filter="' + esc(c.id) + '" aria-selected="' + (c.id === homeCategory) + '">' +
       "<span aria-hidden='true'>" + esc(c.icon) + "</span> " + esc(c.name) + "</button>"
     ).join("");
 
     row.addEventListener("click", (e) => {
       const chip = e.target.closest("[data-filter]");
       if (!chip) return;
-      setCategoryFilter(chip.dataset.filter, false);
+      homeCategory = chip.dataset.filter;
+      $$("#filterRow .chip").forEach((ch) => {
+        const on = ch.dataset.filter === homeCategory;
+        ch.classList.toggle("is-active", on);
+        ch.setAttribute("aria-selected", on ? "true" : "false");
+      });
+      renderHomeProducts();
     });
   }
 
-  function setCategoryFilter(catId, scrollToProducts) {
-    activeCategory = catId;
-    $$("#filterRow .chip").forEach((chip) => {
-      const on = chip.dataset.filter === catId;
-      chip.classList.toggle("is-active", on);
-      chip.setAttribute("aria-selected", on ? "true" : "false");
-    });
-    renderProducts();
-    if (scrollToProducts) {
-      const target = $("#products");
-      if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  }
-
-  /* ================= بناء المنتجات ================= */
-
-  const ADD_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" ' +
-    'stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
-
-  function badgeClass(tone) {
-    if (tone === "hot") return "product-tag is-hot";
-    if (tone === "new") return "product-tag is-new";
-    return "product-tag";
-  }
-
-  function renderProducts() {
+  function renderHomeProducts() {
     const grid = $("#productGrid");
     if (!grid) return;
-    const list = Data.productsByCategory(activeCategory);
-
+    const list = Data.featuredByCategory(homeCategory);
     if (!list.length) {
-      grid.innerHTML = '<p class="demo-note" role="note">لا توجد منتجات في هذا القسم حاليًا.</p>';
+      grid.innerHTML = '<p class="demo-note" role="note">لا توجد منتجات مميزة في هذا القسم حاليًا — ' +
+        '<a href="products.html" style="font-weight:800;color:var(--brand-700)">تصفح كل المنتجات ←</a></p>';
       return;
     }
-
-    grid.innerHTML = list.map((p) => {
-      const cat = Data.getCategory(p.category);
-      const tag = p.badge
-        ? '<span class="' + badgeClass(p.badge.tone) + '">' + esc(p.badge.text) + "</span>"
-        : "";
-      const old = p.oldPrice && p.oldPrice > p.price
-        ? '<span class="price-old">' + fmtPrice(p.oldPrice) + "</span>"
-        : "";
-      return (
-        '<article class="product-card">' +
-          '<div class="product-visual" style="--p1:' + esc(p.tint[0]) + ";--p2:" + esc(p.tint[1]) + '">' +
-            tag +
-            '<span class="p-icon" aria-hidden="true">' + esc(p.icon) + "</span>" +
-          "</div>" +
-          '<div class="product-body">' +
-            '<span class="product-cat">' + esc(cat ? cat.name : "") + "</span>" +
-            '<h3 class="product-name">' + esc(p.name) + "</h3>" +
-            '<p class="product-desc">' + esc(p.desc) + "</p>" +
-            '<div class="product-foot">' +
-              '<div class="price-row"><span class="price">' + fmtPrice(p.price) + "</span>" + old +
-              (p.unit ? '<span class="price-unit">/ ' + esc(p.unit) + "</span>" : "") + "</div>" +
-              '<button type="button" class="add-btn" data-add-product="' + esc(p.id) + '">' +
-                ADD_SVG + " أضف للسلة" +
-              "</button>" +
-            "</div>" +
-          "</div>" +
-        "</article>"
-      );
-    }).join("");
+    grid.innerHTML = list.map(productCardHTML).join("");
   }
 
   /* ================= بناء العروض ================= */
@@ -170,7 +175,7 @@
             '<ul class="offer-items">' + itemsHtml + "</ul>" +
             '<div class="offer-prices"><span class="offer-new">' + fmtPrice(o.newPrice) + "</span>" +
             '<span class="offer-old">' + fmtPrice(o.oldPrice) + "</span></div>" +
-            '<button type="button" class="btn btn-accent btn-block" data-add-offer="' + esc(o.id) + '">' +
+            '<button type="button" class="btn btn-accent btn-block" data-add-offer="' + esc(o.id) + '" aria-label="أضف ' + esc(o.name) + ' للسلة">' +
               "🛒 أضف العرض للسلة" +
             "</button>" +
           "</div>" +
@@ -179,18 +184,114 @@
     }).join("");
   }
 
+  /* ================= نافذة تفاصيل المنتج ================= */
+
+  let modalQty = 1;
+
+  function openProduct(id) {
+    const p = Data.getProduct(id);
+    if (!p) { toast("المنتج غير موجود", "⚠️"); return; }
+    modalQty = 1;
+    renderProductModal(p);
+    const modal = $("#productModal");
+    if (!modal) return;
+    modal.hidden = false;
+    requestAnimationFrame(() => modal.classList.add("show"));
+    document.body.style.overflow = "hidden";
+  }
+
+  function closeProduct() {
+    const modal = $("#productModal");
+    if (!modal) return;
+    modal.classList.remove("show");
+    document.body.style.overflow = "";
+    setTimeout(() => { modal.hidden = true; }, 300);
+  }
+
+  function renderProductModal(p) {
+    const body = $("#productBody");
+    if (!body) return;
+    const cat = Data.getCategory(p.category);
+    const available = p.available !== false;
+    const tint = p.tint || ["#f1f5f9", "#e2e8f0"];
+    const old = p.oldPrice && p.oldPrice > p.price
+      ? '<span class="price-old">بدلًا من ' + fmtPrice(p.oldPrice) + "</span>"
+      : "";
+    const off = p.oldPrice && p.oldPrice > p.price
+      ? '<span class="offer-off" style="position:static">خصم ' + Data.discountPercent(p.oldPrice, p.price) + "%</span>"
+      : "";
+    const related = Data.relatedProducts(p.id, 4);
+
+    body.innerHTML =
+      '<div class="pd-grid">' +
+        '<div class="pd-visual" style="--p1:' + esc(tint[0]) + ";--p2:" + esc(tint[1]) + '">' +
+          (p.badge && available ? '<span class="' + badgeClass(p.badge.tone) + '">' + esc(p.badge.text) + "</span>" : "") +
+          '<span class="pd-icon" aria-hidden="true">' + esc(p.icon || "🛒") + "</span>" +
+        "</div>" +
+        '<div class="pd-info">' +
+          '<span class="product-cat">' + esc(cat ? cat.icon + " " + cat.name : "") + "</span>" +
+          "<h4>" + esc(p.name) + "</h4>" +
+          '<p class="pd-desc">' + esc(p.desc || "") + "</p>" +
+          '<div class="pd-prices"><span class="price price-lg">' + fmtPrice(p.price) + "</span>" + old + off + "</div>" +
+          '<p class="pd-stock ' + (available ? "in" : "out") + '">' +
+            '<span aria-hidden="true">' + (available ? "✅" : "⛔") + "</span> " +
+            (available ? "متوفر" : "غير متوفر") +
+          "</p>" +
+          (available
+            ? '<div class="pd-buy">' +
+                '<div class="stepper stepper-lg">' +
+                  '<button type="button" id="pdDec" aria-label="إنقاص الكمية">−</button>' +
+                  "<b id='pdQty'>1</b>" +
+                  '<button type="button" id="pdInc" aria-label="زيادة الكمية">+</button>' +
+                "</div>" +
+                '<button type="button" class="btn btn-primary btn-lg pd-add" id="pdAdd">' + ADD_SVG + " أضف للسلة</button>" +
+              "</div>"
+            : '<button type="button" class="btn btn-block is-disabled" disabled>غير متوفر حاليًا</button>') +
+        "</div>" +
+      "</div>" +
+      (related.length
+        ? '<div class="pd-related"><h5>💡 قد يعجبك أيضًا</h5>' +
+          '<div class="related-grid">' + related.map(productCardHTML).join("") + "</div></div>"
+        : "");
+
+    body.scrollTop = 0;
+
+    if (!available) return;
+    const max = Config.cart.maxQtyPerItem;
+    const qtyEl = $("#pdQty");
+    $("#pdDec").addEventListener("click", () => {
+      modalQty = Math.max(1, modalQty - 1);
+      qtyEl.textContent = modalQty;
+    });
+    $("#pdInc").addEventListener("click", () => {
+      modalQty = Math.min(max, modalQty + 1);
+      qtyEl.textContent = modalQty;
+    });
+    $("#pdAdd").addEventListener("click", () => {
+      const result = Cart.add("product", p.id, modalQty);
+      if (result === "added") {
+        updateBadges();
+        bumpCartBtn();
+        closeProduct();
+        toast("تمت إضافة المنتج للسلة ✓", "🛒");
+      } else {
+        toast("المنتج غير متوفر حاليًا", "⚠️");
+      }
+    });
+  }
+
   /* ================= عدّادات السلة ================= */
 
   function bumpCartBtn() {
     const btn = $("#cartOpenBtn");
     if (!btn) return;
     btn.classList.remove("bump");
-    void btn.offsetWidth; // إعادة تشغيل الأنيميشن
+    void btn.offsetWidth;
     btn.classList.add("bump");
   }
 
   function updateBadges() {
-    const count = Cart.count();
+    const count = Cart.count(); // إجمالي القطع — وليس الأصناف
     ["#cartCount", "#cartCountMobile"].forEach((sel) => {
       const el = $(sel);
       if (el) {
@@ -222,10 +323,19 @@
     const drawer = $("#cartDrawer");
     const overlay = $("#overlay");
     if (!drawer || !overlay) return;
+    // لا نخفي الـ overlay إذا كانت هناك نافذة أخرى مفتوحة فوقه
     drawer.classList.remove("show");
-    overlay.classList.remove("show");
     document.body.style.overflow = "";
-    setTimeout(() => { drawer.hidden = true; overlay.hidden = true; }, 300);
+    setTimeout(() => {
+      drawer.hidden = true;
+      if (global.Basit.Shop && global.Basit.Shop.isSheetOpen && global.Basit.Shop.isSheetOpen()) return;
+      overlay.classList.remove("show");
+      setTimeout(() => { overlay.hidden = true; }, 250);
+    }, 280);
+  }
+
+  function onShopPage() {
+    return !!document.getElementById("shopGrid");
   }
 
   function renderCart() {
@@ -237,10 +347,10 @@
 
     if (!lines.length) {
       body.innerHTML =
-        '<div class="cart-empty"><span class="big" aria-hidden="true">🧺</span>' +
-        "<strong>سلتك فاضية</strong><p>اختار اللي محتاجه من المنتجات والعروض.</p></div>";
+        '<div class="cart-empty"><span class="big" aria-hidden="true">🛒</span>' +
+        "<strong>السلة فارغة</strong><p>ابدأ بإضافة المنتجات التي تحتاجها.</p></div>";
       foot.innerHTML =
-        '<button type="button" class="btn btn-primary btn-block" data-close-and-goto="#products">🛒 تصفح المنتجات</button>';
+        '<button type="button" class="btn btn-primary btn-block" data-browse-products>تصفح المنتجات ←</button>';
       return;
     }
 
@@ -248,25 +358,30 @@
       '<div class="cart-line" data-line="' + esc(l.key) + '">' +
         '<span class="cl-visual" style="--p1:' + esc(l.tint[0]) + ";--p2:" + esc(l.tint[1]) + '" aria-hidden="true">' + esc(l.icon) + "</span>" +
         '<div class="cl-info"><div class="cl-name">' + esc(l.name) + "</div>" +
-        '<div class="cl-price">' + fmtPrice(l.price) + (l.kind === "offer" ? " • عرض" : "") + "</div></div>" +
+        '<div class="cl-price">' + fmtPrice(l.price) + (l.kind === "offer" ? " • عرض" : "") + "</div>" +
+        '<div class="cl-total">' + fmtPrice(l.price * l.qty) + "</div></div>" +
         '<div class="cl-side">' +
           '<div class="stepper">' +
-            '<button type="button" data-dec="' + esc(l.key) + '" aria-label="إنقاص الكمية">−</button>' +
+            '<button type="button" data-dec="' + esc(l.key) + '" aria-label="إنقاص كمية ' + esc(l.name) + '">−</button>' +
             "<b>" + l.qty + "</b>" +
-            '<button type="button" data-inc="' + esc(l.key) + '" aria-label="زيادة الكمية">+</button>' +
+            '<button type="button" data-inc="' + esc(l.key) + '" aria-label="زيادة كمية ' + esc(l.name) + '">+</button>' +
           "</div>" +
-          '<button type="button" class="cl-remove" data-del="' + esc(l.key) + '">حذف 🗑️</button>' +
+          '<button type="button" class="cl-remove" data-del="' + esc(l.key) + '" aria-label="حذف ' + esc(l.name) + ' من السلة">حذف 🗑️</button>' +
         "</div>" +
       "</div>"
     ).join("");
 
     const savings = Cart.savings();
     foot.innerHTML =
+      '<div class="total-row"><span>🧾 عدد المنتجات</span><output>' + Cart.count() + " قطعة</output></div>" +
+      '<div class="total-row"><span>🛒 إجمالي المنتجات</span><output>' + fmtPrice(Cart.subtotal()) + "</output></div>" +
       (savings > 0
-        ? '<div class="total-row"><span>🎉 إجمالي التوفير</span><output>' + fmtPrice(savings) + "</output></div>"
+        ? '<div class="total-row is-save"><span>🎉 إجمالي التوفير</span><output>' + fmtPrice(savings) + "</output></div>"
         : "") +
+      '<div class="total-row"><span>🚚 التوصيل</span><output class="pending">سيتم تحديده لاحقًا</output></div>' +
+      '<p class="delivery-hint">خيار التوصيل سيتم تأكيده عند استكمال الطلب.</p>' +
       '<div class="total-row grand"><span>الإجمالي</span><output>' + fmtPrice(Cart.total()) + "</output></div>" +
-      '<button type="button" class="btn btn-primary btn-block btn-lg" id="checkoutBtn">تأكيد الطلب ←</button>' +
+      '<button type="button" class="btn btn-primary btn-block btn-lg" id="checkoutBtn">متابعة الطلب ←</button>' +
       '<button type="button" class="btn btn-ghost btn-block" id="clearCartBtn">تفريغ السلة</button>';
   }
 
@@ -357,7 +472,6 @@
     btn.disabled = true;
     btn.textContent = "جاري إرسال طلبك... ⏳";
 
-    // تجهيز بيانات الطلب بصيغة موحدة — جاهزة للـ Backend لاحقًا
     const payload = {
       customer: data,
       items: Cart.lines().map((l) => ({ kind: l.kind, id: l.id, name: l.name, price: l.price, qty: l.qty })),
@@ -396,73 +510,119 @@
     $("#successCloseBtn").addEventListener("click", closeCheckout);
   }
 
-  /* ================= إضافة للسلة (تفويض الأحداث) ================= */
+  /* ================= إضافة للسلة + فتح التفاصيل (تفويض عام) ================= */
 
-  function handleAddClick(e) {
+  function handleGlobalClick(e) {
+    // 1) فتح تفاصيل المنتج
+    const opener = e.target.closest("[data-product]");
+    if (opener) {
+      // إذا كان المنتج داخل نافذة التفاصيل (ترشيحات) نبدّل المحتوى فقط
+      openProduct(opener.dataset.product);
+      return;
+    }
+
+    // 2) إضافة منتج
     const pBtn = e.target.closest("[data-add-product]");
-    const oBtn = e.target.closest("[data-add-offer]");
-    if (!pBtn && !oBtn) return;
-
-    let added = false;
     if (pBtn) {
-      added = Cart.add("product", pBtn.dataset.addProduct, 1);
-      if (added) {
-        const p = Data.getProduct(pBtn.dataset.addProduct);
-        toast("اتضافت للسلة: " + (p ? p.name : ""), "🛒");
+      const result = Cart.add("product", pBtn.dataset.addProduct, 1);
+      if (result === "added") {
+        updateBadges();
+        bumpCartBtn();
+        toast("تمت إضافة المنتج للسلة ✓", "🛒");
         pBtn.classList.add("added");
         const original = pBtn.innerHTML;
         pBtn.innerHTML = "✔️ اتضافت!";
-        setTimeout(() => { pBtn.classList.remove("added"); pBtn.innerHTML = original; }, 1200);
+        setTimeout(() => { pBtn.classList.remove("added"); pBtn.innerHTML = original; }, 1100);
+      } else if (result === "unavailable") {
+        toast("المنتج غير متوفر حاليًا", "⚠️");
+      } else {
+        toast("تعذر إضافة المنتج", "⚠️");
       }
-    } else {
-      added = Cart.add("offer", oBtn.dataset.addOffer, 1);
-      if (added) toast("اتضاف العرض للسلة 🎉", "🔥");
+      return;
     }
-    if (added) {
-      updateBadges();
-      bumpCartBtn();
+
+    // 3) إضافة عرض
+    const oBtn = e.target.closest("[data-add-offer]");
+    if (oBtn) {
+      const result = Cart.add("offer", oBtn.dataset.addOffer, 1);
+      if (result === "added") {
+        updateBadges();
+        bumpCartBtn();
+        toast("اتضاف العرض للسلة 🎉", "🔥");
+      }
+      return;
+    }
+
+    // 4) زر "تصفح المنتجات" من السلة الفارغة
+    const browse = e.target.closest("[data-browse-products]");
+    if (browse) {
+      if (onShopPage()) {
+        closeDrawer();
+        if (global.Basit.Shop) global.Basit.Shop.resetAll();
+        setTimeout(() => {
+          const top = $("#shopTop");
+          if (top) top.scrollIntoView({ behavior: "smooth" });
+        }, 250);
+      } else {
+        window.location.href = "products.html";
+      }
     }
   }
 
-  /* ================= أحداث السلة والدرج ================= */
+  /* ================= أحداث السلة والنوافذ ================= */
 
   function bindCartEvents() {
-    $("#cartOpenBtn").addEventListener("click", openDrawer);
-    $("#bottomCartBtn").addEventListener("click", openDrawer);
-    $("#cartCloseBtn").addEventListener("click", closeDrawer);
-    $("#overlay").addEventListener("click", closeDrawer);
+    const openBtn = $("#cartOpenBtn");
+    const bottomBtn = $("#bottomCartBtn");
+    const closeBtn = $("#cartCloseBtn");
+    const overlay = $("#overlay");
+    if (openBtn) openBtn.addEventListener("click", openDrawer);
+    if (bottomBtn) bottomBtn.addEventListener("click", openDrawer);
+    if (closeBtn) closeBtn.addEventListener("click", closeDrawer);
+    if (overlay) overlay.addEventListener("click", () => {
+      // يقفل الدرج أو شيت الفلاتر (صفحة المنتجات) أيهما مفتوح
+      const drawer = $("#cartDrawer");
+      if (drawer && !drawer.hidden && drawer.classList.contains("show")) closeDrawer();
+      if (global.Basit.Shop && global.Basit.Shop.closeSheet) global.Basit.Shop.closeSheet();
+    });
     $$("[data-open-cart]").forEach((b) => b.addEventListener("click", openDrawer));
 
-    $("#cartDrawer").addEventListener("click", (e) => {
+    const drawer = $("#cartDrawer");
+    if (drawer) drawer.addEventListener("click", (e) => {
       const inc = e.target.closest("[data-inc]");
       const dec = e.target.closest("[data-dec]");
       const del = e.target.closest("[data-del]");
-      const goto = e.target.closest("[data-close-and-goto]");
       if (inc) { Cart.setQty(inc.dataset.inc, currentQty(inc.dataset.inc) + 1); renderCart(); return; }
       if (dec) { Cart.setQty(dec.dataset.dec, currentQty(dec.dataset.dec) - 1); renderCart(); return; }
       if (del) { Cart.remove(del.dataset.del); renderCart(); toast("اتمسح من السلة", "🗑️"); return; }
-      if (goto) {
-        closeDrawer();
-        setTimeout(() => {
-          const t = $(goto.dataset.closeAndGoto);
-          if (t) t.scrollIntoView({ behavior: "smooth" });
-        }, 250);
-        return;
-      }
       if (e.target.closest("#checkoutBtn")) { openCheckout(); return; }
       if (e.target.closest("#clearCartBtn")) { Cart.clear(); renderCart(); toast("السلة فضيت", "🧺"); }
     });
 
-    $("#checkoutCloseBtn").addEventListener("click", closeCheckout);
-    $("#checkoutModal").addEventListener("click", (e) => {
+    const coClose = $("#checkoutCloseBtn");
+    const coModal = $("#checkoutModal");
+    if (coClose) coClose.addEventListener("click", closeCheckout);
+    if (coModal) coModal.addEventListener("click", (e) => {
       if (e.target.id === "checkoutModal") closeCheckout();
     });
 
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") { closeDrawer(); closeCheckout(); }
+    const pdClose = $("#productCloseBtn");
+    const pdModal = $("#productModal");
+    if (pdClose) pdClose.addEventListener("click", closeProduct);
+    if (pdModal) pdModal.addEventListener("click", (e) => {
+      if (e.target.id === "productModal") closeProduct();
     });
 
-    document.addEventListener("click", handleAddClick);
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        closeDrawer();
+        closeCheckout();
+        closeProduct();
+        if (global.Basit.Shop && global.Basit.Shop.closeSheet) global.Basit.Shop.closeSheet();
+      }
+    });
+
+    document.addEventListener("click", handleGlobalClick);
   }
 
   function currentQty(key) {
@@ -470,43 +630,48 @@
     return line ? line.qty : 0;
   }
 
-  /* ================= الهيدر والتنقل ================= */
+  /* ================= الهيدر والتنقل والظهور ================= */
 
   function bindScrollEffects() {
     const header = $("#siteHeader");
-    const onScroll = () => header.classList.toggle("is-scrolled", window.scrollY > 12);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
+    if (header) {
+      const onScroll = () => header.classList.toggle("is-scrolled", window.scrollY > 12);
+      window.addEventListener("scroll", onScroll, { passive: true });
+      onScroll();
+    }
 
-    // تمييز القسم النشط في التنقل
-    const map = [
-      ["home", "home"], ["products", "products"], ["offers", "offers"], ["location", "location"],
-    ];
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (!entry.isIntersecting) return;
-        const id = entry.target.id;
-        $$(".nav-link").forEach((a) =>
-          a.classList.toggle("is-active", a.getAttribute("href") === "#" + id));
-        $$(".bn-item[data-nav]").forEach((b) =>
-          b.classList.toggle("is-active", b.dataset.nav === id));
-      });
-    }, { rootMargin: "-40% 0px -55% 0px" });
-    map.forEach(([id]) => {
-      const sec = document.getElementById(id);
-      if (sec) observer.observe(sec);
-    });
+    // تمييز القسم النشط (الرئيسية فقط — العناصر غير الموجودة تُتجاهل)
+    const ids = ["home", "products", "offers", "location"];
+    const targets = ids.map((id) => document.getElementById(id)).filter(Boolean);
+    if (targets.length && "IntersectionObserver" in window) {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (!entry.isIntersecting) return;
+          const id = entry.target.id;
+          $$(".nav-link").forEach((a) =>
+            a.classList.toggle("is-active", a.getAttribute("href") === "#" + id));
+          $$(".bn-item[data-nav]").forEach((b) =>
+            b.classList.toggle("is-active", b.dataset.nav === id));
+        });
+      }, { rootMargin: "-40% 0px -55% 0px" });
+      targets.forEach((sec) => observer.observe(sec));
+    }
 
     // الظهور التدريجي
-    const revealObs = new IntersectionObserver((entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add("is-visible");
-          revealObs.unobserve(entry.target);
-        }
-      });
-    }, { threshold: 0.12 });
-    $$(".reveal").forEach((el) => revealObs.observe(el));
+    const reveals = $$(".reveal");
+    if (reveals.length && "IntersectionObserver" in window) {
+      const revealObs = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("is-visible");
+            revealObs.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.12 });
+      reveals.forEach((el) => revealObs.observe(el));
+    } else {
+      reveals.forEach((el) => el.classList.add("is-visible"));
+    }
   }
 
   /* ================= تهيئة الواجهة ================= */
@@ -514,8 +679,8 @@
   function init() {
     Cart.load();
     renderCategories();
-    renderFilters();
-    renderProducts();
+    renderHomeFilters();
+    renderHomeProducts();
     renderOffers();
     updateBadges();
     bindCartEvents();
@@ -525,5 +690,9 @@
   }
 
   global.Basit = global.Basit || {};
-  global.Basit.UI = { init, toast, openDrawer, openCheckout, setCategoryFilter, renderCart };
+  global.Basit.UI = {
+    init, toast, openDrawer, closeDrawer, openCheckout,
+    openProduct, closeProduct, renderCart, updateBadges,
+    productCardHTML, fmtPrice, esc,
+  };
 })(window);
