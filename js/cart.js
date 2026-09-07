@@ -53,6 +53,16 @@
     try {
       localStorage.setItem(storageKey(), JSON.stringify(items));
     } catch (e) { /* التخزين غير متاح — تستمر السلة في الذاكرة فقط */ }
+    notifyChange();
+  }
+
+  /** إشعار باقي الواجهة (صفحة Checkout) بأي تغيير في السلة */
+  function notifyChange() {
+    try {
+      if (typeof document !== "undefined" && typeof CustomEvent === "function") {
+        document.dispatchEvent(new CustomEvent("basit:cart-changed"));
+      }
+    } catch (e) { /* تجاهل */ }
   }
 
   /** هل الصنف صالح للإضافة؟ (موجود + متوفر + سعر سليم) */

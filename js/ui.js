@@ -381,7 +381,7 @@
       '<div class="total-row"><span>🚚 التوصيل</span><output class="pending">سيتم تحديده لاحقًا</output></div>' +
       '<p class="delivery-hint">خيار التوصيل سيتم تأكيده عند استكمال الطلب.</p>' +
       '<div class="total-row grand"><span>الإجمالي</span><output>' + fmtPrice(Cart.total()) + "</output></div>" +
-      '<button type="button" class="btn btn-primary btn-block btn-lg" id="checkoutBtn">متابعة الطلب ←</button>' +
+      '<a class="btn btn-primary btn-block btn-lg" href="checkout.html">متابعة الطلب ←</a>' +
       '<button type="button" class="btn btn-ghost btn-block" id="clearCartBtn">تفريغ السلة</button>';
   }
 
