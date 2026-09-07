@@ -52,6 +52,14 @@ export const env = {
   },
 
   // --- حسابات العملاء + OTP (المرحلة 9) ---
+  tracking: {
+    enabled: toBool(process.env.ORDER_TRACKING_ENABLED, true),
+  },
+  notifications: {
+    enabled: toBool(process.env.NOTIFICATIONS_ENABLED, true),
+  },
+  statusPollSeconds: Math.min(120, Math.max(15, toInt(process.env.ORDER_STATUS_POLL_INTERVAL_SECONDS, 30))),
+
   auth: {
     enabled: toBool(process.env.CUSTOMER_AUTH_ENABLED, true),
     // ⚠️ سر — من .env فقط، ولا يدخل Git أبدًا

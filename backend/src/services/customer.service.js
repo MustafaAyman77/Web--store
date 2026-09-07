@@ -78,8 +78,21 @@ export function getMyOrderDetails(customerId, orderNumber) {
     fulfillmentMethod: order.fulfillment_method,
     notes: order.notes || "",
     createdAt: order.created_at,
+    updatedAt: order.updated_at,
     items,
+    statusHistory: getStatusHistorySafe(order.id),
   };
+}
+
+function getStatusHistorySafe(orderId) {
+  try {
+    const db = getDb();
+    return db
+      .prepare("SELECT status, created_at AS createdAt FROM order_status_history WHERE order_id = ? ORDER BY created_at ASC, rowid ASC;")
+      .all(orderId);
+  } catch {
+    return [];
+  }
 }
 
 /** تعديل البروفايل — الهاتف لا يتغير هنا أبدًا */

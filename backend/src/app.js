@@ -18,6 +18,7 @@ import categoriesRoutes from "./routes/categories.routes.js";
 import recommendationsRoutes from "./routes/recommendations.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import meRoutes from "./routes/me.routes.js";
+import notificationsRoutes from "./routes/notifications.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -51,6 +52,9 @@ export function createApp() {
       success: true,
       data: {
         deliveryEnabled: env.delivery.enabled,
+        trackingEnabled: env.tracking.enabled,
+        notificationsEnabled: env.notifications.enabled,
+        statusPollSeconds: env.statusPollSeconds,
         store: { name: "أسواق البسيط", currency: "ج.م" },
       },
     });
@@ -63,6 +67,7 @@ export function createApp() {
   app.use("/api/recommendations", attachCustomer, recommendationsRoutes);
   app.use("/api/auth", authRoutes);
   app.use("/api/me", attachCustomer, meRoutes);
+  app.use("/api/notifications", attachCustomer, notificationsRoutes);
   app.use("/api/admin", adminRoutes);
 
   // ---------- لوحة التحكم (SPA — كل مسارات /admin تخدم index.html) ----------

@@ -52,8 +52,8 @@
         '<p class="success-note">' + demoNote + "</p>" +
         '<div id="accInvite"></div>' +
         '<div class="success-actions">' +
-          '<a class="btn btn-primary" href="products.html">🛒 العودة للتسوق</a>' +
-          '<a class="btn btn-outline" href="index.html">🏠 الرئيسية</a>' +
+          '<a class="btn btn-primary" href="track-order.html?n=' + encodeURIComponent(orderNo) + '">📦 تتبع طلبك</a>' +
+          '<a class="btn btn-outline" href="products.html">🛒 العودة للتسوق</a>' +
         "</div>" +
       "</div>";
     offerAccount(order);

@@ -13,6 +13,8 @@ import { ApiError } from "../utils/api-error.js";
 import { sendOrderNotification } from "./telegram.service.js";
 import { deductForOrder, restoreForOrder } from "./inventory.service.js";
 import { assertCustomerCanOrder } from "./customer.service.js";
+import { recordStatusChange } from "./status-history.service.js";
+import { createStatusNotification } from "./notification.service.js";
 
 export const ORDER_STATUSES = [
   "new", "confirmed", "preparing", "ready",
@@ -160,6 +162,12 @@ export async function createOrder(body) {
     }
     // خصم المخزون + تسجيل حركات بيع — داخل نفس الـTransaction
     if (trackedLines.length) deductForOrder(db, trackedLines, orderNumber);
+    // تاريخ الحالة + إشعار الاستلام — داخل نفس الـTransaction
+    recordStatusChange(db, { orderId, status: "new", changedBy: "system" });
+    createStatusNotification(db, {
+      customerId: customer.id, orderId, orderNumber,
+      status: "new", fulfillmentMethod: input.fulfillmentMethod,
+    });
 
     return {
       orderId,
@@ -257,6 +265,12 @@ export function updateOrderStatus(ref, status, actor) {
   }
   const restored = transaction((tx) => {
     tx.prepare("UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?;").run(status, order.id);
+    // التاريخ + إشعار العميل — داخل نفس الـTransaction (فشلها يُلغي تغيير الحالة)
+    recordStatusChange(tx, { orderId: order.id, status, changedBy: "admin" });
+    createStatusNotification(tx, {
+      customerId: order.customer_id, orderId: order.id, orderNumber: order.order_number,
+      status, fulfillmentMethod: order.fulfillment_method,
+    });
     // الإلغاء يعيد المخزون مرة واحدة فقط (لطلبات خُصم مخزونها فعلًا)
     if (status === "cancelled" && Number(order.stock_deducted) === 1 && Number(order.stock_restored) !== 1) {
       return restoreForOrder(tx, order.id, order.order_number, actor || "");
@@ -264,6 +278,54 @@ export function updateOrderStatus(ref, status, actor) {
     return 0;
   });
   return { orderId: order.id, orderNumber: order.order_number, status, prevStatus: order.status, stockRestored: restored };
+}
+
+/* ================= تتبع الضيف (رقم طلب + هاتف — خطأ موحّد) ================= */
+
+const TRACK_FAIL = "لم نتمكن من العثور على هذا الطلب. تأكد من رقم الطلب ورقم الهاتف.";
+
+export function trackOrder({ orderNumber, phone }) {
+  if (!env.tracking.enabled) {
+    throw ApiError.forbidden("TRACKING_DISABLED", "خدمة تتبع الطلب غير متاحة حاليًا.");
+  }
+  const ref = String(orderNumber || "").trim().slice(0, 40);
+  const normalized = validateEgyptianPhone(phone);
+  if (!ref || !normalized) throw ApiError.notFound("ORDER_NOT_FOUND", TRACK_FAIL);
+  const db = getDb();
+  // مطابقة مزدوجة في استعلام واحد — لا كشف لأي جزء على حدة
+  const order = db
+    .prepare(
+      `SELECT o.* FROM orders o JOIN customers c ON c.id = o.customer_id
+       WHERE o.order_number = ? AND c.phone = ?;`
+    )
+    .get(ref, normalized);
+  if (!order) throw ApiError.notFound("ORDER_NOT_FOUND", TRACK_FAIL);
+  const items = db
+    .prepare("SELECT product_name AS name, quantity, price, subtotal FROM order_items WHERE order_id = ?;")
+    .all(order.id);
+  return {
+    orderNumber: order.order_number,
+    status: order.status,
+    subtotal: order.subtotal,
+    deliveryFee: order.delivery_fee,
+    total: order.total,
+    fulfillmentMethod: order.fulfillment_method,
+    createdAt: order.created_at,
+    updatedAt: order.updated_at,
+    items,
+    statusHistory: getStatusHistorySafe(order.id),
+  };
+}
+
+function getStatusHistorySafe(orderId) {
+  try {
+    const db = getDb();
+    return db
+      .prepare("SELECT status, created_at AS createdAt FROM order_status_history WHERE order_id = ? ORDER BY created_at ASC, rowid ASC;")
+      .all(orderId);
+  } catch {
+    return [];
+  }
 }
 
 export function getCustomerById(id) {

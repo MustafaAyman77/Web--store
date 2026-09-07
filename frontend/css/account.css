@@ -114,3 +114,27 @@
 .acc-invite p { font-weight: 700; font-size: 0.92rem; margin-bottom: 0.7rem; }
 .acc-invite-row { display: flex; gap: 0.6rem; }
 .acc-invite-row .btn { flex: 1; }
+
+/* ---------------- الجرس + التتبع (المرحلة 10) ---------------- */
+.notif-bell { position: relative; display: inline-grid; place-items: center; width: 42px; height: 42px; font-size: 1.25rem; text-decoration: none; background: var(--brand-50); border: 1px solid var(--brand-200); border-radius: var(--radius-full); }
+.notif-count { position: absolute; top: -4px; inset-inline-end: -4px; min-width: 20px; height: 20px; padding: 0 5px; background: #dc2626; color: #fff; font-size: 0.7rem; font-weight: 900; border-radius: var(--radius-full); display: grid; place-items: center; }
+.notif-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.7rem; }
+.notif-head h1 { margin: 0; }
+.notif-item { display: block; width: 100%; text-align: start; background: var(--bg); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 0.7rem 0.8rem; margin-bottom: 0.55rem; cursor: pointer; font: inherit; color: inherit; }
+.notif-item b { display: block; font-size: 0.9rem; }
+.notif-item p { margin: 0.2rem 0; font-size: 0.83rem; color: var(--muted); }
+.notif-item.is-unread { background: var(--brand-50); border-color: var(--brand-200); }
+.notif-item.is-unread b::before { content: "🔴 "; font-size: 0.6rem; }
+.notif-empty { text-align: center; padding: 2rem 1rem; color: var(--muted); }
+.notif-empty span { font-size: 2.2rem; display: block; margin-bottom: 0.5rem; }
+.notif-skel { height: 64px; border-radius: var(--radius-md); background: linear-gradient(90deg, var(--border-soft) 25%, var(--bg) 50%, var(--border-soft) 75%); background-size: 200% 100%; animation: skelShimmer 1.2s infinite; margin-bottom: 0.55rem; }
+@keyframes skelShimmer { to { background-position: -200% 0; } }
+.track-banner { background: var(--brand-50); border: 1.5px solid var(--brand-300); color: var(--brand-900); font-weight: 900; text-align: center; border-radius: var(--radius-md); padding: 0.7rem; margin-bottom: 0.8rem; font-size: 0.95rem; }
+.track-banner.is-done { background: #f0fdf4; border-color: #86efac; color: #15803d; }
+.track-banner.is-cancelled { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+.track-history { margin: 0.8rem 0; }
+.track-history h3 { font-size: 0.95rem; margin-bottom: 0.4rem; }
+.track-history ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.track-history li { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.83rem; border-bottom: 1px dashed var(--border-soft); padding-bottom: 0.3rem; }
+.track-history li span { color: var(--muted); white-space: nowrap; }
+.track-live { text-align: center; font-size: 0.78rem; color: var(--muted); margin: 0.6rem 0; }

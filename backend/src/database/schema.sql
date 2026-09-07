@@ -69,6 +69,31 @@ CREATE TABLE IF NOT EXISTS customer_sessions (
 CREATE INDEX IF NOT EXISTS idx_sessions_token ON customer_sessions(token_hash);
 CREATE INDEX IF NOT EXISTS idx_sessions_customer ON customer_sessions(customer_id);
 
+-- تاريخ حالات الطلب (المرحلة 10)
+CREATE TABLE IF NOT EXISTS order_status_history (
+  id         TEXT PRIMARY KEY,
+  order_id   TEXT NOT NULL REFERENCES orders(id),
+  status     TEXT NOT NULL,
+  changed_by TEXT NOT NULL DEFAULT 'system', -- admin | system
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_osh_order ON order_status_history(order_id, created_at);
+
+-- إشعارات العملاء الداخلية (المرحلة 10)
+CREATE TABLE IF NOT EXISTS notifications (
+  id          TEXT PRIMARY KEY,
+  customer_id TEXT NOT NULL REFERENCES customers(id),
+  order_id    TEXT REFERENCES orders(id),
+  type        TEXT NOT NULL, -- order_created | order_confirmed | ... | order_cancelled
+  title       TEXT NOT NULL,
+  message     TEXT NOT NULL DEFAULT '',
+  is_read     INTEGER NOT NULL DEFAULT 0,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE (customer_id, order_id, type)
+);
+CREATE INDEX IF NOT EXISTS idx_notif_customer ON notifications(customer_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_notif_unread ON notifications(customer_id, is_read);
+
 CREATE TABLE IF NOT EXISTS orders (
   id               TEXT PRIMARY KEY,         -- UUID داخلي
   order_number     TEXT NOT NULL UNIQUE,     -- BS-YYYYMMDD-NNNN للعميل

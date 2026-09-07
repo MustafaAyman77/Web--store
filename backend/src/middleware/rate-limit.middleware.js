@@ -50,6 +50,12 @@ export const limitSendOtpPhone = createRateLimiter({
   code: "RATE_LIMITED", message: "طلبات كثيرة لهذا الرقم — حاول مرة أخرى لاحقًا.",
 });
 
+// تتبع الضيف: 60/ساعة لكل IP — يمنع تخمين أرقام الطلبات آليًا
+export const limitTrack = createRateLimiter({
+  windowMs: 60 * 60 * 1000, max: 60, key: ipOf,
+  code: "RATE_LIMITED", message: "محاولات كثيرة — حاول مرة أخرى لاحقًا.",
+});
+
 // تحقق OTP: 30/ساعة لكل IP (المحاولات على الرمز نفسه محدودة بـ OTP_MAX_ATTEMPTS)
 export const limitVerifyOtp = createRateLimiter({
   windowMs: 60 * 60 * 1000, max: 30, key: ipOf,

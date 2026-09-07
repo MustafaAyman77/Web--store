@@ -58,6 +58,7 @@
     const items = [
       ["home", "👋 حسابي", "account.html"],
       ["orders", "🧾 طلباتي", "account.html?view=orders"],
+      ["notifications", "🔔 الإشعارات", "account.html?view=notifications"],
       ["profile", "📋 بياناتي", "account.html?view=profile"],
     ];
     return '<nav class="acc-tabs" aria-label="أقسام الحساب">' +
@@ -198,7 +199,9 @@
           '<div id="accOrderStatus">' + statusChip(o.status) + "</div>" +
           '<p class="acc-muted">' + esc(fmtDate(o.createdAt)) + " • " +
           (o.fulfillmentMethod === "pickup" ? "🏪 استلام من المحل" : "🚚 توصيل للمنزل") + "</p>" +
+          '<p class="acc-muted">🕘 آخر تحديث: ' + esc(ago(o.updatedAt || o.createdAt)) + "</p>" +
           '<div id="accOrderTimeline">' + timeline(o) + "</div>" +
+          historyHTML(o.statusHistory) +
           '<div class="acc-items">' +
           o.items.map((it) =>
             '<div class="summary-line"><span>' + esc(it.name) + " × " + it.quantity + "</span><b>" + fmtPrice(it.subtotal) + "</b></div>"
@@ -214,6 +217,8 @@
           '<a class="btn btn-outline btn-block" href="products.html">🛒 متابعة التسوق</a>';
         const rb = document.getElementById("accReorder");
         if (rb) rb.addEventListener("click", () => reorder(o));
+        // إيقاف التحديث عند الحالات النهائية
+        if (o.status === "completed" || o.status === "cancelled") stopPolling();
       } catch (e) {
         if (e.message === "unauthorized") return;
         const box = document.getElementById("accOrderBox");
@@ -225,6 +230,14 @@
     // تحديث تلقائي كل 45 ثانية داخل صفحة الطلب فقط
     stopPolling();
     pollTimer = setInterval(paint, 45000);
+  }
+
+  function historyHTML(hist) {
+    if (!hist || !hist.length) return "";
+    return '<div class="track-history"><h3>🕘 تطور الطلب</h3><ul>' +
+      hist.map((h) =>
+        "<li><b>" + esc(STATUS[h.status] || h.status) + "</b><span>" + esc(fmtDate(h.createdAt)) + "</span></li>"
+      ).join("") + "</ul></div>";
   }
 
   function reorder(order) {
@@ -251,6 +264,66 @@
     } else {
       UI.toast("هذا المنتج غير متوفر حاليًا", "⚠️");
     }
+  }
+
+  /* ================= الإشعارات ================= */
+
+  function ago(ts) {
+    try {
+      const ms = Date.now() - new Date(String(ts).replace(" ", "T") + "Z").getTime();
+      if (!Number.isFinite(ms) || ms < 0) return "";
+      const m = Math.floor(ms / 60000);
+      if (m < 1) return "منذ لحظات";
+      if (m < 60) return "منذ " + m + " دقيقة";
+      const h = Math.floor(m / 60);
+      if (h < 24) return "منذ " + h + " ساعة";
+      return "منذ " + Math.floor(h / 24) + " يوم";
+    } catch (e) { return ""; }
+  }
+
+  async function renderNotifications(root) {
+    root.innerHTML = tabs("notifications") +
+      '<section class="acc-card"><div class="notif-head"><h1>🔔 الإشعارات</h1>' +
+      '<button type="button" class="link-btn" id="notifReadAll">تحديد الكل كمقروء</button></div>' +
+      '<div id="notifList"><div class="notif-skel"></div><div class="notif-skel"></div><div class="notif-skel"></div></div></section>';
+    const box = document.getElementById("notifList");
+    const load = async () => {
+      box.innerHTML = '<div class="notif-skel"></div><div class="notif-skel"></div><div class="notif-skel"></div>';
+      try {
+        const d = await api("/api/notifications?limit=20");
+        if (!d.notifications.length) {
+          box.innerHTML = '<div class="notif-empty"><span aria-hidden="true">🔔</span><p>لا توجد إشعارات جديدة.</p></div>';
+          return;
+        }
+        box.innerHTML = d.notifications.map((n) =>
+          '<button type="button" class="notif-item' + (n.isRead ? "" : " is-unread") + '" data-notif="' + esc(n.id) + '" data-order="' + esc(n.orderNumber || "") + '">' +
+            "<b>" + esc(n.title) + "</b><p>" + esc(n.message) + "</p>" +
+            '<small class="acc-muted">' + esc(ago(n.createdAt)) + "</small>" +
+          "</button>"
+        ).join("");
+        box.querySelectorAll("[data-notif]").forEach((el) => {
+          el.addEventListener("click", async () => {
+            try { await api("/api/notifications/" + encodeURIComponent(el.dataset.notif) + "/read", { method: "PATCH" }); } catch (e) { /* تجاهل */ }
+            if (global.Basit.Notif) global.Basit.Notif.refresh();
+            if (el.dataset.order) location.href = "account.html?view=order&n=" + encodeURIComponent(el.dataset.order);
+            else load();
+          });
+        });
+      } catch (e) {
+        if (e.message === "unauthorized") return;
+        box.innerHTML = '<div class="notif-empty"><p>تعذر تحميل الإشعارات.</p>' +
+          '<button type="button" class="btn btn-outline" id="notifRetry">حاول مرة أخرى</button></div>';
+        document.getElementById("notifRetry").addEventListener("click", load);
+      }
+    };
+    document.getElementById("notifReadAll").addEventListener("click", async () => {
+      try {
+        await api("/api/notifications/read-all", { method: "PATCH" });
+        if (global.Basit.Notif) global.Basit.Notif.refresh();
+        load();
+      } catch (e) { if (e.message !== "unauthorized") global.Basit.UI.toast(e.message, "⚠️"); }
+    });
+    await load();
   }
 
   /* ================= البيانات ================= */
@@ -340,6 +413,7 @@
     try {
       if (view === "orders") await renderOrders(root);
       else if (view === "order" && qs.get("n")) await renderOrder(root, qs.get("n"));
+      else if (view === "notifications") await renderNotifications(root);
       else if (view === "profile") await renderProfile(root, me);
       else await renderHome(root, me);
     } catch (e) { /* الحارس أعلاه يتعامل مع 401 */ }

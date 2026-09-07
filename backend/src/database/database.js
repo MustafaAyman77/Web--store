@@ -113,6 +113,21 @@ function migrate(database) {
     created_at TEXT NOT NULL DEFAULT (datetime('now')));`);
   database.exec("CREATE INDEX IF NOT EXISTS idx_sessions_token ON customer_sessions(token_hash);");
   database.exec("CREATE INDEX IF NOT EXISTS idx_sessions_customer ON customer_sessions(customer_id);");
+  // --- المرحلة 10: تاريخ الحالات + الإشعارات ---
+  database.exec(`CREATE TABLE IF NOT EXISTS order_status_history (
+    id TEXT PRIMARY KEY, order_id TEXT NOT NULL REFERENCES orders(id),
+    status TEXT NOT NULL, changed_by TEXT NOT NULL DEFAULT 'system',
+    created_at TEXT NOT NULL DEFAULT (datetime('now')));`);
+  database.exec("CREATE INDEX IF NOT EXISTS idx_osh_order ON order_status_history(order_id, created_at);");
+  database.exec(`CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY, customer_id TEXT NOT NULL REFERENCES customers(id),
+    order_id TEXT REFERENCES orders(id), type TEXT NOT NULL,
+    title TEXT NOT NULL, message TEXT NOT NULL DEFAULT '',
+    is_read INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (customer_id, order_id, type));`);
+  database.exec("CREATE INDEX IF NOT EXISTS idx_notif_customer ON notifications(customer_id, created_at);");
+  database.exec("CREATE INDEX IF NOT EXISTS idx_notif_unread ON notifications(customer_id, is_read);");
   const adminCols = database.prepare("PRAGMA table_info(admins);").all().map((c) => c.name);
   if (!adminCols.includes("role")) {
     database.exec("ALTER TABLE admins ADD COLUMN role TEXT NOT NULL DEFAULT 'owner';");
