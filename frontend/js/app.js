@@ -34,12 +34,13 @@
     try {
       const api = global.Basit.Api;
       const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 2500));
+      const recsPreload = global.Basit.Recs ? global.Basit.Recs.preload().catch(() => {}) : Promise.resolve();
       Promise.race([api.getProducts(), timeout])
         .then((data) => {
           if (data && data.products && data.products.length) global.BasitData._replaceAll(data);
         })
         .catch(() => { /* الوضع المحلي — تجاهل */ })
-        .finally(boot);
+        .finally(() => { Promise.race([recsPreload, timeout]).catch(() => {}).finally(boot); });
       setTimeout(boot, 3000); // أمان: إقلاع إجباري
     } catch (err) {
       boot();

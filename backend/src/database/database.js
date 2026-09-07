@@ -89,6 +89,14 @@ function migrate(database) {
   database.exec("CREATE INDEX IF NOT EXISTS idx_movements_product ON inventory_movements(product_id);");
   database.exec("CREATE INDEX IF NOT EXISTS idx_movements_created ON inventory_movements(created_at);");
   seedCategories(database);
+  // --- المرحلة 8: حقول العملاء + فهارس التوصيات ---
+  const customerCols = database.prepare("PRAGMA table_info(customers);").all().map((c) => c.name);
+  if (!customerCols.includes("email")) database.exec("ALTER TABLE customers ADD COLUMN email TEXT DEFAULT '';");
+  if (!customerCols.includes("notes")) database.exec("ALTER TABLE customers ADD COLUMN notes TEXT DEFAULT '';");
+  if (!customerCols.includes("status")) database.exec("ALTER TABLE customers ADD COLUMN status TEXT NOT NULL DEFAULT 'active';");
+  database.exec("CREATE INDEX IF NOT EXISTS idx_customers_status ON customers(status);");
+  database.exec("CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id, status);");
+  database.exec("CREATE INDEX IF NOT EXISTS idx_items_product ON order_items(product_id);");
   const adminCols = database.prepare("PRAGMA table_info(admins);").all().map((c) => c.name);
   if (!adminCols.includes("role")) {
     database.exec("ALTER TABLE admins ADD COLUMN role TEXT NOT NULL DEFAULT 'owner';");

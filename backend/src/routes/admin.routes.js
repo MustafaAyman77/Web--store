@@ -6,6 +6,7 @@ import {
   productsList, productCreate, productUpdate, productDelete, productsBulk, customersList, customerDetails,
   categoriesList, categoryCreate, categoryUpdate,
   inventorySummary, inventoryProduct, inventoryAdjust, inventoryHistory,
+  customerUpdate,
 } from "../controllers/admin.controller.js";
 
 const router = Router();
@@ -28,6 +29,7 @@ router.get("/inventory/:productId/history", requireAdmin, asyncHandler(inventory
 router.delete("/products/:id", requireAdmin, asyncHandler(productDelete));
 router.get("/customers", requireAdmin, asyncHandler(customersList));
 router.get("/customers/:id", requireAdmin, asyncHandler(customerDetails));
+router.patch("/customers/:id", requireAdmin, asyncHandler(customerUpdate));
 router.post("/telegram/test", requireAdmin, asyncHandler(telegramTest));
 router.post("/orders/:ref/telegram/retry", requireAdmin, asyncHandler(telegramRetry));
 router.get("/orders", requireAdmin, asyncHandler(orders));

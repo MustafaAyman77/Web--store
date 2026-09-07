@@ -73,6 +73,7 @@
       popularity: Number(p.popularity) || 0,
       added: 0,
       badge: p.badge && p.badge.text ? { text: p.badge.text, tone: p.badge.tone || "offer" } : undefined,
+      isNew: !!p.isNew,
     };
   }
 

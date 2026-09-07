@@ -26,6 +26,15 @@ export function isPurchasable(row) {
   return Number(row.stock_quantity) > 0;
 }
 
+/** هل المنتج جديد؟ أُضيف خلال NEW_PRODUCT_DAYS يومًا (توقيت القاهرة) */
+export function isNewProduct(row, days) {
+  if (!row || !row.created_at) return false;
+  const d = typeof days === "number" && days > 0 ? days : 14;
+  const created = new Date(String(row.created_at).replace(" ", "T") + "Z").getTime();
+  if (!Number.isFinite(created)) return false;
+  return Date.now() - created < d * 24 * 3600 * 1000;
+}
+
 /** الحالة العامة للوحة الإدارة: active | inactive | out_of_stock */
 export function adminStatusOf(row) {
   if (!row) return "inactive";

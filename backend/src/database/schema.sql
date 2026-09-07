@@ -30,10 +30,13 @@ CREATE INDEX IF NOT EXISTS idx_products_available ON products(available);
 CREATE TABLE IF NOT EXISTS customers (
   id         TEXT PRIMARY KEY,               -- UUID
   name       TEXT NOT NULL,
-  phone      TEXT NOT NULL UNIQUE,           -- رقم مصري 11 رقمًا
+  phone      TEXT NOT NULL UNIQUE,           -- رقم مصري 11 رقمًا = مفتاح التعرف
+  email      TEXT DEFAULT '',
   address    TEXT DEFAULT '',
   area       TEXT DEFAULT '',
   landmark   TEXT DEFAULT '',
+  notes      TEXT DEFAULT '',                -- ملاحظات داخلية للإدارة فقط
+  status     TEXT NOT NULL DEFAULT 'active', -- active | inactive | blocked
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

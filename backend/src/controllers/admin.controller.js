@@ -11,6 +11,7 @@ import { testTelegramConnection, retryTelegramNotification } from "../services/t
 import {
   getDashboard, getAdminOrderDetails, listCustomers, getCustomerDetails,
   listProductsAdmin, createProduct, updateProduct, softDeleteProduct, bulkUpdateProducts,
+  setCustomerStatus,
 } from "../services/admin.service.js";
 import { listAdminCategories, createCategory, updateCategory } from "../services/category.service.js";
 import {
@@ -160,15 +161,21 @@ export function productDelete(req, res) {
 }
 
 export function customersList(req, res) {
-  const { search, page, limit } = req.query;
+  const { search, sort, page, limit } = req.query;
   res.json({
     success: true,
     data: listCustomers({
       search: search ? String(search) : undefined,
+      sort: sort ? String(sort) : undefined,
       page: page ? Number(page) : undefined,
       limit: limit ? Number(limit) : undefined,
     }),
   });
+}
+
+export function customerUpdate(req, res) {
+  const result = setCustomerStatus(req.params.id, req.body || {}, req.admin?.username);
+  res.json({ success: true, data: result });
 }
 
 export function customerDetails(req, res) {

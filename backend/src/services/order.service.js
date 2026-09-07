@@ -12,6 +12,7 @@ import { validateEgyptianPhone } from "../utils/phone.js";
 import { ApiError } from "../utils/api-error.js";
 import { sendOrderNotification } from "./telegram.service.js";
 import { deductForOrder, restoreForOrder } from "./inventory.service.js";
+import { assertCustomerCanOrder } from "./customer.service.js";
 
 export const ORDER_STATUSES = [
   "new", "confirmed", "preparing", "ready",
@@ -124,9 +125,17 @@ export async function createOrder(body) {
     // 2) العميل: موجود بنفس الهاتف → استخدام + تحديث بياناته، وإلا → جديد
     let customer = db.prepare("SELECT * FROM customers WHERE phone = ?;").get(input.customer.phone);
     if (customer) {
+      assertCustomerCanOrder(customer);
+      // تحديث غير مُتلِف: القيم الفارغة الجديدة لا تمسح القديمة
       db.prepare(
         "UPDATE customers SET name = ?, address = ?, area = ?, landmark = ?, updated_at = datetime('now') WHERE id = ?;"
-      ).run(input.customer.name, input.customer.address, input.customer.area, input.customer.landmark, customer.id);
+      ).run(
+        input.customer.name || customer.name,
+        input.customer.address || customer.address,
+        input.customer.area || customer.area,
+        input.customer.landmark || customer.landmark,
+        customer.id
+      );
     } else {
       customer = { id: uuidv4(), ...input.customer };
       db.prepare(

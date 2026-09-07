@@ -66,7 +66,11 @@
       ? '<span class="product-tag is-off">🔴 نفد المخزون</span>'
       : !available
         ? '<span class="product-tag is-off">غير متوفر</span>'
-        : (p.badge ? '<span class="' + badgeClass(p.badge.tone) + '">' + esc(p.badge.text) + "</span>" : "");
+        : (p.badge ? '<span class="' + badgeClass(p.badge.tone) + '">' + esc(p.badge.text) + "</span>"
+          : (p.isNew ? '<span class="product-tag is-new">🆕 جديد</span>' : ""));
+    const boughtLine = (available && global.Basit.Recs && global.Basit.Recs.isBought(p.id))
+      ? '<p class="bought-before">❤️ اشتريته قبل كده</p>'
+      : "";
     const old = p.oldPrice && p.oldPrice > p.price
       ? '<span class="price-old">' + fmtPrice(p.oldPrice) + "</span>"
       : "";
@@ -88,6 +92,7 @@
           '<span class="product-cat">' + esc(cat ? cat.name : "") + "</span>" +
           '<button type="button" class="p-open product-name" data-product="' + esc(p.id) + '">' + esc(p.name) + "</button>" +
           '<p class="product-desc">' + esc(p.desc || "") + "</p>" +
+          boughtLine +
           '<div class="product-foot">' +
             '<div class="price-row"><span class="price">' + fmtPrice(p.price) + "</span>" + old +
             (p.unit ? '<span class="price-unit">/ ' + esc(p.unit) + "</span>" : "") + "</div>" +
@@ -224,6 +229,11 @@
       ? '<span class="offer-off" style="position:static">خصم ' + Data.discountPercent(p.oldPrice, p.price) + "%</span>"
       : "";
     const related = Data.relatedProducts(p.id, 4);
+    const times = global.Basit.Recs ? global.Basit.Recs.timesBought(p.id) : 0;
+    const freqLine = !available || times <= 0 ? ""
+      : times >= 3
+        ? '<p class="bought-before">🔄 بتشتريه كتير — ' + times + " مرات قبل كده</p>"
+        : '<p class="bought-before">❤️ اشتريته قبل كده</p>';
 
     body.innerHTML =
       '<div class="pd-grid">' +
@@ -240,6 +250,7 @@
             '<span aria-hidden="true">' + (p.outOfStock === true ? "🔴" : available ? "✅" : "⛔") + "</span> " +
             (p.outOfStock === true ? "نفد المخزون" : available ? ("متوفر" + (p.lowStockQty > 0 ? " — ⚠️ باقي " + p.lowStockQty + " فقط" : "")) : "غير متوفر") +
           "</p>" +
+          freqLine +
           (available
             ? '<div class="pd-buy">' +
                 '<div class="stepper stepper-lg">' +
@@ -252,12 +263,20 @@
             : '<button type="button" class="btn btn-block is-disabled" disabled>' + (p.outOfStock === true ? "🔴 نفد المخزون" : "غير متوفر حاليًا") + "</button>") +
         "</div>" +
       "</div>" +
-      (related.length
-        ? '<div class="pd-related"><h5>💡 قد يعجبك أيضًا</h5>' +
-          '<div class="related-grid">' + related.map(productCardHTML).join("") + "</div></div>"
-        : "");
+      '<div class="pd-related"><h5>💡 ممكن يعجبك كمان</h5>' +
+        '<div class="related-grid" id="pdRelated">' + related.map(productCardHTML).join("") + "</div></div>";
 
     body.scrollTop = 0;
+
+    // ترقية الترشيحات من الـBackend — بصمت عند التعذر
+    try {
+      if (global.Basit.Recs) {
+        global.Basit.Recs.forProduct(p.id, p.category).then((list) => {
+          const box = $("#pdRelated");
+          if (box && list && list.length) box.innerHTML = list.map(recCardHTML).join("");
+        }).catch(() => {});
+      }
+    } catch (e) { /* تجاهل */ }
 
     if (!available) return;
     const max = Config.cart.maxQtyPerItem;
@@ -281,6 +300,84 @@
         toast("المنتج غير متوفر حاليًا", "⚠️");
       }
     });
+  }
+
+  /* ================= التوصيات الذكية ================= */
+
+  function recCardHTML(p) {
+    if (!p || !p.id) return "";
+    const price = Number(p.price) || 0;
+    const old = p.oldPrice && Number(p.oldPrice) > price
+      ? '<span class="price-old">' + fmtPrice(p.oldPrice) + "</span>" : "";
+    const img = p.icon || p.image || "🛒";
+    const visual = /^(https?:\/\/|\/|data:image)/.test(img)
+      ? '<img src="' + esc(img) + '" alt="" loading="lazy" />'
+      : esc(img);
+    const tint = p.tint || ["#f1f5f9", "#e2e8f0"];
+    return (
+      '<article class="rec-card">' +
+        '<button type="button" class="p-open rec-visual" data-product="' + esc(p.id) + '" aria-label="عرض ' + esc(p.name) + '" style="--p1:' + esc(tint[0]) + ";--p2:" + esc(tint[1]) + '">' +
+          (p.isNew ? '<span class="product-tag is-new">🆕</span>' : "") +
+          '<span class="p-icon" aria-hidden="true">' + visual + "</span>" +
+        "</button>" +
+        '<div class="rec-body">' +
+          '<button type="button" class="p-open rec-name" data-product="' + esc(p.id) + '">' + esc(p.name) + "</button>" +
+          '<div class="price-row"><span class="price">' + fmtPrice(price) + "</span>" + old + "</div>" +
+          '<button type="button" class="add-btn rec-add" data-add-product="' + esc(p.id) + '">＋ أضف</button>' +
+        "</div>" +
+      "</article>"
+    );
+  }
+
+  function fillRecSection(secId, gridId, list) {
+    const sec = document.getElementById(secId);
+    const grid = document.getElementById(gridId);
+    if (!sec || !grid) return;
+    if (!list || !list.length) { sec.hidden = true; return; }
+    sec.hidden = false;
+    grid.innerHTML = list.map(recCardHTML).join("");
+  }
+
+  async function renderHomeRecs() {
+    if (!document.getElementById("recPopularGrid") && !document.getElementById("recNewGrid") && !document.getElementById("recPersonalGrid")) return;
+    const Recs = global.Basit.Recs;
+    if (!Recs) return;
+    try {
+      const s = await Recs.getHomeSections();
+      fillRecSection("recPopular", "recPopularGrid", s.popular);
+      fillRecSection("recNew", "recNewGrid", s.fresh);
+      fillRecSection("recPersonal", "recPersonalGrid", s.personal);
+    } catch (e) { /* تُخفى الأقسام */ }
+  }
+
+  async function fillCartRecs() {
+    const box = $("#cartRecs");
+    if (!box) return;
+    const Recs = global.Basit.Recs;
+    if (!Recs) return;
+    try {
+      const ids = Cart.lines().filter((l) => l.kind === "product").map((l) => l.id);
+      const list = await Recs.forCart(ids);
+      if (!list.length || !document.getElementById("cartRecs")) return;
+      box.hidden = false;
+      box.innerHTML = "<h4>🛒 قبل ما تكمل طلبك</h4>" +
+        '<div class="rec-grid rec-grid-sm">' + list.map(recCardHTML).join("") + "</div>";
+    } catch (e) { /* تجاهل */ }
+  }
+
+  async function renderCheckoutRecs() {
+    const sec = $("#coRecs");
+    const grid = $("#coRecsGrid");
+    if (!sec || !grid) return;
+    const Recs = global.Basit.Recs;
+    if (!Recs) return;
+    try {
+      const ids = Cart.lines().filter((l) => l.kind === "product").map((l) => l.id);
+      const list = await Recs.forCart(ids);
+      if (!list.length) { sec.hidden = true; return; }
+      sec.hidden = false;
+      grid.innerHTML = list.map(recCardHTML).join("");
+    } catch (e) { sec.hidden = true; }
   }
 
   /* ================= عدّادات السلة ================= */
@@ -376,6 +473,7 @@
 
     const savings = Cart.savings();
     foot.innerHTML =
+      '<div class="cart-recs" id="cartRecs" hidden></div>' +
       '<div class="total-row"><span>🧾 عدد المنتجات</span><output>' + Cart.count() + " قطعة</output></div>" +
       '<div class="total-row"><span>🛒 إجمالي المنتجات</span><output>' + fmtPrice(Cart.subtotal()) + "</output></div>" +
       (savings > 0
@@ -386,6 +484,7 @@
       '<div class="total-row grand"><span>الإجمالي</span><output>' + fmtPrice(Cart.total()) + "</output></div>" +
       '<a class="btn btn-primary btn-block btn-lg" href="checkout.html">متابعة الطلب ←</a>' +
       '<button type="button" class="btn btn-ghost btn-block" id="clearCartBtn">تفريغ السلة</button>';
+    fillCartRecs();
   }
 
   /* ================= نافذة تأكيد الطلب ================= */
@@ -486,6 +585,7 @@
     const result = await global.Basit.Api.submitOrder(payload);
 
     if (result.ok) {
+      if (global.Basit.Recs) global.Basit.Recs.remember(data.phone, data.name);
       Cart.clear();
       updateBadges();
       renderSuccess(result.orderNo);
@@ -685,6 +785,7 @@
     renderHomeFilters();
     renderHomeProducts();
     renderOffers();
+    renderHomeRecs();
     updateBadges();
     bindCartEvents();
     bindScrollEffects();
@@ -696,6 +797,6 @@
   global.Basit.UI = {
     init, toast, openDrawer, closeDrawer, openCheckout,
     openProduct, closeProduct, renderCart, updateBadges,
-    productCardHTML, fmtPrice, esc,
+    productCardHTML, recCardHTML, renderCheckoutRecs, fmtPrice, esc,
   };
 })(window);

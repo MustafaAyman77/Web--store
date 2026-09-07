@@ -45,6 +45,11 @@ export const env = {
     chatId: process.env.TELEGRAM_CHAT_ID || "",
     timeoutMs: toInt(process.env.TELEGRAM_TIMEOUT_MS, 10000),
   },
+
+  recommendations: {
+    newProductDays: Math.max(1, toInt(process.env.NEW_PRODUCT_DAYS, 14)),
+    minCoOccurrences: Math.max(1, toInt(process.env.RECOMMENDATION_MIN_CO_OCCURRENCES, 3)),
+  },
 };
 
 export default env;

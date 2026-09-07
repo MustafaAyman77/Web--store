@@ -3,7 +3,8 @@
 // ==========================================================================
 import { getDb } from "../database/database.js";
 import { ApiError } from "../utils/api-error.js";
-import { stockStatusOf, discountPercent, isPurchasable, adminStatusOf } from "../utils/product-status.js";
+import { stockStatusOf, discountPercent, isPurchasable, adminStatusOf, isNewProduct } from "../utils/product-status.js";
+import { env } from "../config/env.js";
 
 /** تطبيع النص العربي للبحث (نفس منطق الواجهة) */
 function normalizeAr(str) {
@@ -40,6 +41,7 @@ export function toPublicProduct(row) {
     purchasable: isPurchasable(row),
     status: adminStatusOf(row),
     discountPercent: discountPercent(row.price, row.old_price),
+    isNew: isNewProduct(row, env.recommendations.newProductDays),
     popularity: Number(row.popularity) || 0,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

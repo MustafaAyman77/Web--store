@@ -273,6 +273,7 @@
 
       const res = await Orders.submitOrder(built.payload);
       if (res && res.ok) {
+        if (global.Basit.Recs) global.Basit.Recs.remember(built.payload.customer.phone, built.payload.customer.name);
         Cart.clear(); // تفريغ السلة بعد نجاح إنشاء الطلب فقط
         UI.updateBadges();
         window.location.href = "success.html";
@@ -369,10 +370,26 @@
     Orders = global.Basit.Orders;
     if (!onPage() || !Cart || !UI || !Orders) return;
     bind();
+    prefillRemembered();
     applyFulfillment();
     renderSummary();
     renderReview();
     fetchDeliveryConfig();
+    if (UI.renderCheckoutRecs) UI.renderCheckoutRecs();
+  }
+
+  /** تعبئة الاسم والهاتف من زيارة سابقة (على جهاز العميل فقط) */
+  function prefillRemembered() {
+    try {
+      const Recs = global.Basit.Recs;
+      if (!Recs) return;
+      const r = Recs.getRemembered();
+      if (!r) return;
+      const nameEl = document.getElementById("coName");
+      const phoneEl = document.getElementById("coPhone");
+      if (nameEl && !nameEl.value && r.name) nameEl.value = r.name;
+      if (phoneEl && !phoneEl.value && r.phone) phoneEl.value = r.phone;
+    } catch (e) { /* تجاهل */ }
   }
 
   global.Basit = global.Basit || {};

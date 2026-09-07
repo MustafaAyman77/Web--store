@@ -967,36 +967,44 @@
     document.title = "العملاء | لوحة التحكم";
     const qs = new URLSearchParams(location.search);
     const search = qs.get("search") || "";
+    const sort = qs.get("sort") || "";
     const page = Math.max(1, Number(qs.get("page")) || 1);
+    const go = (patch) => {
+      const nq = new URLSearchParams(location.search);
+      Object.entries(patch).forEach(([k, v]) => { if (!v) nq.delete(k); else nq.set(k, v); });
+      navigate("/admin/customers" + (nq.toString() ? "?" + nq : ""));
+    };
 
     view.innerHTML =
       '<div class="ad-page-head"><div><h1>👥 العملاء</h1><p>كل عملاء المحل ونشاطهم.</p></div></div>' +
-      '<div class="ad-toolbar"><div class="ad-search"><span aria-hidden="true">🔎</span><input id="cSearch" placeholder="ابحث بالاسم أو الهاتف..." value="' + esc(search) + '" /></div></div>' +
+      '<div class="ad-toolbar"><div class="ad-search"><span aria-hidden="true">🔎</span><input id="cSearch" placeholder="ابحث بالاسم أو الهاتف..." value="' + esc(search) + '" /></div>' +
+      '<select id="cSort" class="ad-btn ad-btn-outline ad-btn-sm" style="min-height:50px" aria-label="ترتيب العملاء">' +
+      [["", "الأحدث"], ["top_spent", "💰 الأكثر شراءً"], ["top_orders", "🧾 الأكثر طلبًا"]].map(([v, l]) => '<option value="' + v + '"' + (v === sort ? " selected" : "") + ">" + l + "</option>").join("") +
+      "</select></div>" +
       '<div class="ad-list" id="cList">' + skel(4) + "</div><div id='cPager'></div>";
 
     let timer = null;
     document.getElementById("cSearch").addEventListener("input", (e) => {
       clearTimeout(timer);
-      timer = setTimeout(() => {
-        const nq = new URLSearchParams();
-        if (e.target.value.trim()) nq.set("search", e.target.value.trim());
-        navigate("/admin/customers" + (nq.toString() ? "?" + nq : ""));
-      }, 400);
+      timer = setTimeout(() => go({ search: e.target.value.trim(), page: "" }), 400);
     });
+    document.getElementById("cSort").addEventListener("change", (e) => go({ sort: e.target.value, page: "" }));
 
     try {
       const q = new URLSearchParams({ limit: "20", page: String(page) });
       if (search) q.set("search", search);
+      if (sort) q.set("sort", sort);
       const data = await api("/admin/customers?" + q);
       document.getElementById("cList").innerHTML = data.customers.length
         ? data.customers.map((c) =>
           '<a class="ad-card ad-row-card" data-link href="/admin/customers/' + esc(c.id) + '">' +
-          '<div class="ad-row-top"><strong>👤 ' + esc(c.name) + "</strong><span>🧾 " + c.ordersCount + " طلب</span></div>" +
+          '<div class="ad-row-top"><strong>👤 ' + esc(c.name) + "</strong><span>🧾 " + c.ordersCount + " طلب" +
+          (c.status === "blocked" ? ' <span class="st st-ontg-failed">⛔ موقوف</span>' : c.status === "inactive" ? ' <span class="st st-cancelled">⚪ غير نشط</span>' : "") + "</span></div>" +
           '<div class="ad-row-meta"><span>📞 <b dir="ltr">' + esc(c.phone) + "</b></span><span>💰 إجمالي: <b>" + fmtPrice(c.totalSpent) + "</b></span>" +
           "<span>🕐 آخر طلب: " + (c.lastOrderAt ? esc(fmtDT(c.lastOrderAt)) : "—") + "</span></div>" +
           "</a>").join("")
         : stateHTML("👥", "لا يوجد عملاء", search ? "جرّب بحثًا مختلفًا." : "العملاء هيظهروا هنا بعد أول طلب.");
-      const base = "/admin/customers?" + (() => { const b = new URLSearchParams(); if (search) b.set("search", search); b.set("limit", "20"); return b.toString(); })();
+      const base = "/admin/customers?" + (() => { const b = new URLSearchParams(); if (search) b.set("search", search); if (sort) b.set("sort", sort); b.set("limit", "20"); return b.toString(); })();
       document.getElementById("cPager").innerHTML = pagerHTML(data.page, data.total, data.limit, base);
     } catch (ex) {
       document.getElementById("cList").innerHTML = stateHTML("⚠️", "حدث خطأ أثناء تحميل العملاء", ex.message || "", '<button type="button" class="ad-btn ad-btn-primary" id="retryBtn">إعادة المحاولة</button>');
@@ -1023,6 +1031,23 @@
         '<section class="ad-card"><h2>📊 النشاط</h2>' +
         '<div class="ad-kv"><span class="k">عدد الطلبات</span><span class="v">' + c.ordersCount + "</span></div>" +
         '<div class="ad-kv"><span class="k">إجمالي المشتريات</span><span class="v">' + fmtPrice(c.totalSpent) + "</span></div>" +
+        "</section>" +
+        '<section class="ad-card"><h2>⚙️ الحالة والملاحظات</h2>' +
+        '<div class="ad-field"><label for="csStatus">الحالة</label><select id="csStatus">' +
+        [["active", "🟢 نشط"], ["inactive", "⚪ غير نشط"], ["blocked", "⛔ موقوف"]].map(([v, l]) => '<option value="' + v + '"' + (c.status === v ? " selected" : "") + ">" + l + "</option>").join("") +
+        "</select></div>" +
+        '<div class="ad-field" style="margin-top:.5rem"><label for="csNotes">ملاحظات داخلية (لا تظهر للعميل)</label><textarea id="csNotes" placeholder="...">' + esc(c.notes || "") + "</textarea></div>" +
+        '<button type="button" class="ad-btn ad-btn-primary ad-btn-sm" id="csSave" style="margin-top:.5rem">💾 حفظ</button>' +
+        "</section>" +
+        '<section class="ad-card"><h2>🏆 أكثر المنتجات شراءً</h2>' +
+        ((c.topProducts && c.topProducts.length)
+          ? c.topProducts.slice(0, 8).map((t, i) => '<div class="ad-kv"><span class="k">' + (i + 1) + ". " + esc(t.name) + "</span><span class='v'>" + t.times + " مرات</span></div>").join("")
+          : '<p style="color:var(--muted);font-size:.88rem">لا توجد مشتريات بعد.</p>') +
+        "</section>" +
+        '<section class="ad-card"><h2>❤️ الأقسام المفضلة</h2>' +
+        ((c.favoriteCategories && c.favoriteCategories.length)
+          ? '<div class="ad-chips">' + c.favoriteCategories.map((f) => '<button type="button" disabled>' + esc(catName(f.category)) + "</button>").join("") + "</div>"
+          : '<p style="color:var(--muted);font-size:.88rem">لا توجد بيانات بعد.</p>') +
         "</section></div>" +
         '<h2 class="ad-section-title">🧾 سجل الطلبات</h2>' +
         '<div class="ad-list">' +
@@ -1034,6 +1059,21 @@
             "</a>").join("")
           : stateHTML("🧾", "لا توجد طلبات", "لم يقم هذا العميل بأي طلب بعد.")) +
         "</div>";
+
+      document.getElementById("csSave").addEventListener("click", async (e) => {
+        const btn = e.currentTarget;
+        const st = document.getElementById("csStatus").value;
+        if (st === "blocked" && c.status !== "blocked") {
+          const ok = await confirmDlg("حظر العميل؟", "لن يتمكن " + c.name + " من إنشاء طلبات جديدة. الطلبات القديمة محفوظة.", "حظر", true);
+          if (!ok) return;
+        }
+        btn.disabled = true;
+        try {
+          await api("/admin/customers/" + encodeURIComponent(id), { method: "PATCH", body: { status: st, notes: document.getElementById("csNotes").value } });
+          toast("✅ تم حفظ بيانات العميل");
+          pageCustomerDetails(id);
+        } catch (ex) { toast(ex.message || "تعذر الحفظ", true); btn.disabled = false; }
+      });
     } catch (ex) {
       view.innerHTML = '<a class="ad-back" data-link href="/admin/customers">→ رجوع للعملاء</a>' +
         stateHTML("⚠️", "تعذر تحميل العميل", ex.message || "");

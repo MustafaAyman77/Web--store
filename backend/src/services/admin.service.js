@@ -8,6 +8,7 @@ import { logAudit } from "../utils/audit.js";
 import { toPublicProduct } from "../controllers/products.controller.js";
 import { allowedNext, ORDER_STATUSES, getOrderByIdOrNumber } from "./order.service.js";
 import { categoryExists } from "./category.service.js";
+import { getPurchaseHistory } from "./customer-history.service.js";
 
 /* ================= نطاق "اليوم" بتوقيت القاهرة ================= */
 
@@ -109,20 +110,22 @@ function paginate(page, limit) {
   return { limit, offset: (p - 1) * limit, page: p };
 }
 
-export function listCustomers({ search, page, limit } = {}) {
+export function listCustomers({ search, sort, page, limit } = {}) {
   const { limit: lim, offset, page: p } = paginate(page, limit);
   const db = getDb();
   const where = search ? "WHERE c.name LIKE ? OR c.phone LIKE ?" : "";
   const like = `%${String(search || "").slice(0, 60)}%`;
   const vals = search ? [like, like] : [];
+  const orderBy = sort === "top_spent" ? "totalSpent DESC"
+    : sort === "top_orders" ? "ordersCount DESC" : "c.created_at DESC";
   const rows = db
     .prepare(
-      `SELECT c.id, c.name, c.phone, c.created_at AS createdAt,
+      `SELECT c.id, c.name, c.phone, c.status, c.created_at AS createdAt,
               COUNT(o.id) AS ordersCount,
               COALESCE(SUM(CASE WHEN o.status != 'cancelled' THEN o.total ELSE 0 END), 0) AS totalSpent,
               MAX(o.created_at) AS lastOrderAt
        FROM customers c LEFT JOIN orders o ON o.customer_id = c.id
-       ${where} GROUP BY c.id ORDER BY c.created_at DESC LIMIT ? OFFSET ?;`
+       ${where} GROUP BY c.id ORDER BY ${orderBy} LIMIT ? OFFSET ?;`
     )
     .all(...vals, lim, offset);
   const totalRow = db
@@ -131,10 +134,35 @@ export function listCustomers({ search, page, limit } = {}) {
   return { customers: rows, total: totalRow.count, limit: lim, offset, page: p };
 }
 
+export function setCustomerStatus(id, body, actor) {
+  const db = getDb();
+  const existing = db.prepare("SELECT * FROM customers WHERE id = ?;").get(id);
+  if (!existing) throw ApiError.notFound("CUSTOMER_NOT_FOUND", "العميل غير موجود.");
+  const patch = {};
+  if (body?.status !== undefined) {
+    const st = String(body.status);
+    if (!["active", "inactive", "blocked"].includes(st)) {
+      throw ApiError.badRequest("INVALID_STATUS", "حالة العميل غير صحيحة.");
+    }
+    patch.status = st;
+  }
+  if (body?.notes !== undefined) patch.notes = String(body.notes ?? "").trim().slice(0, 500);
+  const keys = Object.keys(patch);
+  if (keys.length) {
+    const set = keys.map((k) => `${k} = ?`).join(", ");
+    db.prepare(`UPDATE customers SET ${set}, updated_at = datetime('now') WHERE id = ?;`)
+      .run(...keys.map((k) => patch[k]), id);
+  }
+  if (keys.length) {
+    logAudit({ actor, action: "customer.update", entity: "customer", entityId: id, meta: { changes: patch } });
+  }
+  return getCustomerDetails(id);
+}
+
 export function getCustomerDetails(id) {
   const db = getDb();
   const customer = db
-    .prepare("SELECT id, name, phone, address, area, landmark, created_at AS createdAt FROM customers WHERE id = ?;")
+    .prepare("SELECT id, name, phone, email, address, area, landmark, notes, status, created_at AS createdAt FROM customers WHERE id = ?;")
     .get(id);
   if (!customer) throw ApiError.notFound("CUSTOMER_NOT_FOUND", "العميل غير موجود.");
   const orders = db
@@ -148,7 +176,12 @@ export function getCustomerDetails(id) {
   const spent = orders
     .filter((o) => o.status !== "cancelled")
     .reduce((s, o) => s + Number(o.total), 0);
-  return { ...customer, ordersCount: orders.length, totalSpent: spent, orders };
+  const history = getPurchaseHistory(id);
+  return {
+    ...customer, ordersCount: orders.length, totalSpent: spent, orders,
+    topProducts: history.products.slice(0, 10),
+    favoriteCategories: history.favoriteCategories,
+  };
 }
 
 /* ================= المنتجات (للإدارة) ================= */
