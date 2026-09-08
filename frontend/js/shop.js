@@ -7,6 +7,7 @@
   "use strict";
 
   const SORT_OPTIONS = [
+    { value: "relevance",  label: "الأكثر صلة" },
     { value: "popular",    label: "الأكثر شيوعًا" },
     { value: "price-asc",  label: "السعر: من الأقل للأعلى" },
     { value: "price-desc", label: "السعر: من الأعلى للأقل" },
@@ -22,9 +23,18 @@
     maxPrice: "",
     offersOnly: false,
     availOnly: false,
+    page: 1,
+    total: 0,
   };
 
   let sheetOpen = false;
+  let searchBackend = false; // البحث الخلفي متاح؟
+  let searchSeq = 0;         // إلغاء الاستجابات المتأخرة
+  let suggestSeq = 0;
+  let currentItems = [];     // نتائج البحث الحالية (للترقيم)
+  let didYouMean = null;
+  let suggestItems = [];     // عناصر القائمة المنسدلة
+  let suggestActive = -1;
 
   const $ = (sel, root) => (root || document).querySelector(sel);
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
@@ -35,11 +45,26 @@
 
   /* ================= قراءة قسم من الرابط (?cat=) ================= */
 
-  function readCatFromURL() {
+  function readStateFromURL() {
     try {
       const params = new URLSearchParams(window.location.search);
       const cat = params.get("cat");
       if (cat && global.BasitData.getCategory(cat)) state.cat = cat;
+      const q = (params.get("q") || "").trim().slice(0, 60);
+      if (q) { state.q = q; state.sort = "relevance"; }
+      const sort = params.get("sort");
+      if (sort && SORT_OPTIONS.some((o) => o.value === sort)) state.sort = sort;
+    } catch (e) { /* تجاهل */ }
+  }
+
+  function syncURL() {
+    try {
+      const url = new URL(window.location.href);
+      if (state.q.trim()) url.searchParams.set("q", state.q.trim());
+      else url.searchParams.delete("q");
+      if (state.cat !== "all") url.searchParams.set("cat", state.cat);
+      else url.searchParams.delete("cat");
+      window.history.replaceState({}, "", url);
     } catch (e) { /* تجاهل */ }
   }
 
@@ -102,7 +127,22 @@
 
   function esc(s) { return global.Basit.UI.esc(s); }
 
+  function useBackendSearch() {
+    return searchBackend && !!state.q.trim();
+  }
+
+  function backendSort() {
+    if (state.sort === "offers") return "relevance"; // + offer=1 بالإجبار أدناه
+    return ["relevance", "newest", "popular", "price-asc", "price-desc"].includes(state.sort)
+      ? state.sort : "relevance";
+  }
+
   function render() {
+    syncURL();
+    if (useBackendSearch()) { runBackendSearch(false); return; }
+    hideSearchExtras();
+    state.total = 0;
+    currentItems = [];
     const grid = $("#shopGrid");
     const count = $("#shopCount");
     if (!grid) return;
@@ -117,6 +157,134 @@
     syncChips();
     syncFilterForms();
     updateFilterBadge();
+  }
+
+  function hideSearchExtras() {
+    didYouMean = null;
+    const c = $("#searchCorrect");
+    if (c) { c.hidden = true; c.innerHTML = ""; }
+    const w = $("#loadMoreWrap");
+    if (w) w.hidden = true;
+  }
+
+  /** تنفيذ البحث الخلفي — reset=false للصفحة الأولى، ودمج عند "عرض المزيد" */
+  function runBackendSearch(append) {
+    const grid = $("#shopGrid");
+    const count = $("#shopCount");
+    if (!grid) return;
+    if (!append) {
+      state.page = 1;
+      currentItems = [];
+      grid.innerHTML = skeletonHTML();
+      if (count) count.textContent = "جاري البحث...";
+    }
+    hideSearchExtras();
+    const seq = ++searchSeq;
+    const q = state.q.trim();
+    const S = global.Basit.Search;
+    S.query({
+      q,
+      category: state.cat,
+      minPrice: state.minPrice,
+      maxPrice: state.maxPrice,
+      available: state.availOnly,
+      offer: state.offersOnly || state.sort === "offers",
+      sort: backendSort(),
+      page: state.page,
+      limit: 20,
+    }).then((d) => {
+      if (seq !== searchSeq) return;
+      state.total = d.total;
+      didYouMean = d.didYouMean || null;
+      const mapped = (d.results || []).map(global.Basit.Api.mapProduct);
+      global.BasitData._upsertProducts(mapped);
+      currentItems = append ? currentItems.concat(mapped) : mapped;
+      if (count) {
+        count.textContent = state.total === 0
+          ? "لا توجد نتائج عن «" + q + "»"
+          : "نتيجة البحث عن «" + q + "»: " + state.total + " منتج";
+      }
+      if (!currentItems.length) {
+        grid.innerHTML = zeroResultsHTML(q);
+        fillZeroExtras();
+      } else {
+        grid.innerHTML = currentItems.map(global.Basit.UI.productCardHTML).join("");
+      }
+      renderCorrection();
+      updateLoadMore();
+      S.saveRecent(q);
+      syncChips();
+      syncFilterForms();
+      updateFilterBadge();
+    }).catch((err) => {
+      if (seq !== searchSeq) return;
+      if (count) count.textContent = "تعذر إتمام البحث";
+      grid.innerHTML = '<div class="shop-empty" role="alert">' +
+        '<span class="shop-empty-icon" aria-hidden="true">⚠️</span>' +
+        "<h3>حدث خطأ أثناء البحث.</h3><p>" + esc((err && err.message) || "حاول مرة أخرى.") + "</p>" +
+        '<button type="button" class="btn btn-primary" data-shop-retry>إعادة المحاولة</button></div>';
+    });
+  }
+
+  function updateLoadMore() {
+    const wrap = $("#loadMoreWrap");
+    if (!wrap) return;
+    if (currentItems.length < state.total) {
+      wrap.hidden = false;
+      const btn = wrap.querySelector("[data-load-more]");
+      if (btn) btn.textContent = "عرض المزيد (" + currentItems.length + " من " + state.total + ")";
+    } else {
+      wrap.hidden = true;
+    }
+  }
+
+  function renderCorrection() {
+    const box = $("#searchCorrect");
+    if (!box) return;
+    if (!didYouMean || currentItems.length) { box.hidden = true; box.innerHTML = ""; return; }
+    box.hidden = false;
+    box.innerHTML = '<span>«هل تقصد: <b>' + esc(didYouMean) + "؟»</span> " +
+      '<button type="button" class="btn btn-outline btn-sm" data-apply-correction>عرض النتائج</button>';
+  }
+
+  /* ---------- صفر نتائج: رسالة لطيفة + بدائل حقيقية ---------- */
+
+  function zeroResultsHTML(q) {
+    return '<div class="shop-empty" role="status">' +
+      '<span class="shop-empty-icon" aria-hidden="true">🔍</span>' +
+      "<h3>لم نجد المنتج الذي تبحث عنه.</h3>" +
+      '<p>جرّب كتابة اسم مختلف عن «' + esc(q) + "».</p>" +
+      '<button type="button" class="btn btn-primary" data-shop-reset>عرض جميع المنتجات</button></div>' +
+      '<div class="zero-extra" id="zeroMaybe" hidden><h4>💡 ممكن يعجبك</h4><div class="product-grid" id="zeroMaybeGrid"></div></div>' +
+      '<div class="zero-extra" id="zeroPopular" hidden><h4>🔥 الأكثر بحثًا</h4><div class="chip-row" id="zeroPopularChips"></div></div>' +
+      '<div class="zero-extra"><a class="btn btn-accent btn-block" href="offers.html">🔥 تصفح عروض اليوم</a></div>';
+  }
+
+  function fillZeroExtras() {
+    try {
+      const Recs = global.Basit.Recs;
+      if (Recs && Recs.personal) {
+        Recs.personal(4).then((list) => {
+          const box = $("#zeroMaybe");
+          const grid = $("#zeroMaybeGrid");
+          if (!box || !grid || !list || !list.length) return;
+          global.BasitData._upsertProducts(list);
+          grid.innerHTML = list.map(global.Basit.UI.productCardHTML).join("");
+          box.hidden = false;
+        }).catch(() => {});
+      }
+      const S = global.Basit.Search;
+      if (S && S.popular) {
+        S.popular().then((rows) => {
+          const box = $("#zeroPopular");
+          const chips = $("#zeroPopularChips");
+          if (!box || !chips || !rows || !rows.length) return;
+          chips.innerHTML = rows.slice(0, 6).map((r) =>
+            '<button type="button" class="chip" data-zero-q="' + esc(r.query) + '">🔥 ' + esc(r.query) + "</button>").join("");
+          box.hidden = false;
+        }).catch(() => {});
+      }
+    } catch (e) { /* تجاهل — تبقى الرسالة الأساسية */ }
   }
 
   /* ================= شرائح الأقسام ================= */
@@ -136,6 +304,7 @@
       const chip = e.target.closest("[data-shop-cat]");
       if (!chip) return;
       state.cat = chip.dataset.shopCat;
+      state.page = 1;
       render();
     });
   }
@@ -221,6 +390,7 @@
       state.minPrice = String(b);
       state.maxPrice = String(a);
     }
+    state.page = 1;
     render();
   }
 
@@ -238,6 +408,10 @@
     state.q = "";
     state.cat = "all";
     state.sort = "popular";
+    state.page = 1;
+    state.total = 0;
+    currentItems = [];
+    closeSuggest();
     state.minPrice = "";
     state.maxPrice = "";
     state.offersOnly = false;
@@ -294,26 +468,164 @@
     }, 280);
   }
 
+  /* ================= الاقتراحات + السجل + الأكثر بحثًا ================= */
+
+  function dropEl() { return $("#searchDrop"); }
+  function dropListEl() { return $("#searchDropList"); }
+
+  function closeSuggest() {
+    const d = dropEl();
+    if (d) d.hidden = true;
+    const input = $("#shopSearch");
+    if (input) input.setAttribute("aria-expanded", "false");
+    suggestItems = [];
+    suggestActive = -1;
+  }
+
+  function openSuggest(items, showClear) {
+    const d = dropEl();
+    const list = dropListEl();
+    if (!d || !list) return;
+    suggestItems = items || [];
+    suggestActive = -1;
+    if (!suggestItems.length && !showClear) { closeSuggest(); return; }
+    list.innerHTML = suggestItems.map((it, i) =>
+      '<li role="option" id="sg-' + i + '" data-sg="' + i + '" aria-selected="false">' +
+      '<span class="sg-icon" aria-hidden="true">' + it.icon + "</span>" +
+      "<span>" + esc(it.text) + "</span>" +
+      (it.hint ? '<small class="sg-hint">' + esc(it.hint) + "</small>" : "") +
+      "</li>").join("") +
+      (showClear ? '<li class="sg-clear" data-sg-clear><span aria-hidden="true">🗑️</span><span>مسح سجل البحث</span></li>' : "");
+    d.hidden = false;
+    const input = $("#shopSearch");
+    if (input) input.setAttribute("aria-expanded", "true");
+  }
+
+  function paintSuggestActive() {
+    $$("#searchDropList [data-sg]").forEach((li) => {
+      const on = Number(li.dataset.sg) === suggestActive;
+      li.classList.toggle("is-active", on);
+      li.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    const input = $("#shopSearch");
+    if (input) input.setAttribute("aria-activedescendant", suggestActive >= 0 ? "sg-" + suggestActive : "");
+  }
+
+  function activateSuggest(item) {
+    if (!item) return;
+    closeSuggest();
+    const input = $("#shopSearch");
+    if (item.kind === "product" && item.productId) {
+      const p = global.BasitData.getProduct(item.productId);
+      if (p) { global.Basit.UI.openProduct(item.productId); return; }
+    }
+    if (item.kind === "category" && item.category) {
+      state.cat = item.category;
+      state.q = "";
+      if (input) input.value = "";
+      state.sort = "popular";
+      const sort = $("#shopSort");
+      if (sort) sort.value = "popular";
+      render();
+      return;
+    }
+    state.q = item.text;
+    if (input) input.value = item.text;
+    state.sort = "relevance";
+    const sort = $("#shopSort");
+    if (sort) sort.value = "relevance";
+    render();
+    $("#shopGrid").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  /** محتوى القائمة عند التركيز بدون كتابة: السجل ثم الأكثر بحثًا */
+  function showDropHome() {
+    if (!searchBackend) return;
+    const S = global.Basit.Search;
+    const items = S.getRecent().slice(0, 5).map((t) => ({ kind: "recent", text: t, icon: "🕐" }));
+    const hasRecent = items.length > 0;
+    S.popular().then((rows) => {
+      if (document.activeElement !== $("#shopSearch")) return; // المستخدم غادر الحقل
+      (rows || []).slice(0, 4).forEach((r) => {
+        if (!items.some((x) => x.text === r.query)) items.push({ kind: "popular", text: r.query, icon: "🔥" });
+      });
+      openSuggest(items, hasRecent);
+    }).catch(() => {
+      if (document.activeElement === $("#shopSearch")) openSuggest(items, hasRecent);
+    });
+  }
+
+  function refreshSuggest(text) {
+    if (!searchBackend) { closeSuggest(); return; }
+    const q = String(text || "").trim();
+    if (!q) { showDropHome(); return; }
+    const seq = ++suggestSeq;
+    global.Basit.Search.suggest(q, 6).then((rows) => {
+      if (seq !== suggestSeq) return;
+      openSuggest((rows || []).map((r) => ({
+        kind: r.type === "category" ? "category" : "product",
+        text: r.text, icon: r.type === "category" ? "📁" : "🔍",
+        hint: r.type === "category" ? "قسم" : "",
+        productId: r.productId, category: r.category,
+      })), false);
+    }).catch(() => { if (seq === suggestSeq) closeSuggest(); });
+  }
+
   /* ================= الربط ================= */
 
   function bind() {
-    // البحث اللحظي
+    // البحث اللحظي + الاقتراحات
     const search = $("#shopSearch");
     if (search) {
       let timer = null;
+      let sgTimer = null;
       search.addEventListener("input", () => {
         clearTimeout(timer);
+        clearTimeout(sgTimer);
+        sgTimer = setTimeout(() => refreshSuggest(search.value), 160);
         timer = setTimeout(() => {
           state.q = search.value;
+          state.page = 1;
           render();
-        }, 140);
+        }, searchBackend && search.value.trim() ? 450 : 140);
+      });
+      search.addEventListener("focus", () => {
+        if (!search.value.trim()) showDropHome();
+        else refreshSuggest(search.value);
+      });
+      search.addEventListener("keydown", (e) => {
+        const d = dropEl();
+        const open = d && !d.hidden && suggestItems.length;
+        if (e.key === "Escape") { closeSuggest(); return; }
+        if (!open) {
+          if (e.key === "Enter") { e.preventDefault(); state.q = search.value; state.page = 1; render(); }
+          return;
+        }
+        if (e.key === "ArrowDown") { e.preventDefault(); suggestActive = (suggestActive + 1) % suggestItems.length; paintSuggestActive(); }
+        else if (e.key === "ArrowUp") { e.preventDefault(); suggestActive = (suggestActive - 1 + suggestItems.length) % suggestItems.length; paintSuggestActive(); }
+        else if (e.key === "Enter") { e.preventDefault(); activateSuggest(suggestItems[suggestActive]); }
       });
       const clearBtn = $("#searchClear");
       if (clearBtn) clearBtn.addEventListener("click", () => {
         search.value = "";
         state.q = "";
+        state.page = 1;
+        closeSuggest();
         render();
         search.focus();
+      });
+      document.addEventListener("click", (e) => {
+        if (!e.target.closest(".search-box")) closeSuggest();
+      });
+      const drop = dropEl();
+      if (drop) drop.addEventListener("click", (e) => {
+        if (e.target.closest("[data-sg-clear]")) {
+          global.Basit.Search.clearRecent();
+          showDropHome();
+          return;
+        }
+        const li = e.target.closest("[data-sg]");
+        if (li) activateSuggest(suggestItems[Number(li.dataset.sg)]);
       });
     }
 
@@ -326,24 +638,49 @@
       sort.value = state.sort;
       sort.addEventListener("change", () => {
         state.sort = sort.value;
+        state.page = 1;
         render();
       });
     }
 
-    // أزرار تطبيق/مسح داخل النموذجين
+    // أزرار تطبيق/مسح داخل النموذجين + البحث
     document.addEventListener("click", (e) => {
       const apply = e.target.closest("[data-f-apply]");
       if (apply) {
         const root = apply.closest("#filterSide, #filterSheetBody");
         if (root) applyFromForm(root);
         closeSheet();
-        const n = getFiltered().length;
+        const n = useBackendSearch() ? state.total : getFiltered().length;
         global.Basit.UI.toast(n > 0 ? "تم تطبيق الفلاتر ✓" : "لا توجد نتائج مطابقة", n > 0 ? "✅" : "🔍");
         return;
       }
       const clear = e.target.closest("[data-f-clear]");
       if (clear) { resetAll(false); return; }
-      if (e.target.closest("[data-shop-reset]")) { resetAll(false); }
+      if (e.target.closest("[data-shop-reset]")) { resetAll(false); return; }
+      if (e.target.closest("[data-shop-retry]")) { render(); return; }
+      if (e.target.closest("[data-load-more]")) {
+        state.page += 1;
+        runBackendSearch(true);
+        return;
+      }
+      if (e.target.closest("[data-apply-correction]")) {
+        if (didYouMean) {
+          state.q = didYouMean;
+          const input = $("#shopSearch");
+          if (input) input.value = didYouMean;
+          state.page = 1;
+          render();
+        }
+        return;
+      }
+      const zq = e.target.closest("[data-zero-q]");
+      if (zq) {
+        state.q = zq.dataset.zeroQ;
+        const input = $("#shopSearch");
+        if (input) input.value = state.q;
+        state.page = 1;
+        render();
+      }
     });
 
     // زر التصفية (موبايل/تابلت) + إغلاق الشيت
@@ -355,7 +692,7 @@
 
   function init() {
     if (!isShopPage()) return;
-    readCatFromURL();
+    readStateFromURL();
     renderChips();
     buildFilterForms();
     bind();
@@ -363,7 +700,17 @@
     const grid = $("#shopGrid");
     if (grid) grid.innerHTML = skeletonHTML();
     updateFilterBadge();
-    setTimeout(render, 320);
+    const input = $("#shopSearch");
+    if (input && state.q) input.value = state.q;
+    const sort = $("#shopSort");
+    if (sort) sort.value = state.sort;
+    const boot = () => setTimeout(render, 120);
+    try {
+      if (global.Basit.Search) {
+        global.Basit.Search.backendReady().then((ok) => { searchBackend = !!ok; boot(); }).catch(boot);
+      } else boot();
+    } catch (e) { boot(); }
+    setTimeout(render, 2500); // أمان: عرض إجباري
   }
 
   global.Basit = global.Basit || {};

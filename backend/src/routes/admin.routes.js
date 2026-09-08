@@ -14,6 +14,7 @@ import {
   adminUpdate as promoUpdate, adminEnable as promoEnable, adminDisable as promoDisable,
   adminDelete as promoDelete,
 } from "../controllers/promotions.controller.js";
+import { adminAnalytics as searchAnalytics } from "../controllers/search.controller.js";
 
 const router = Router();
 
@@ -53,5 +54,6 @@ router.patch("/promotions/:id", requireAdmin, asyncHandler(promoUpdate));
 router.post("/promotions/:id/enable", requireAdmin, asyncHandler(promoEnable));
 router.post("/promotions/:id/disable", requireAdmin, asyncHandler(promoDisable));
 router.delete("/promotions/:id", requireAdmin, asyncHandler(promoDelete));
+router.get("/search/analytics", requireAdmin, asyncHandler(searchAnalytics));
 
 export default router;

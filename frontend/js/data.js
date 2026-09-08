@@ -176,6 +176,15 @@
      * استبدال البيانات المحلية ببيانات الـ Backend (تُستدعى مرة عند الإقلاع).
      * تُعدَّل المصفوفات في مكانها حتى تبقى كل المراجع سليمة.
      */
+    /** دمج نتائج البحث/الترشيحات في القائمة (للشراء والتفاصيل) — يُحدَّث الموجود ويُضاف الجديد */
+    _upsertProducts(list) {
+      (list || []).forEach((p) => {
+        if (!p || !p.id) return;
+        const i = PRODUCTS.findIndex((x) => x.id === p.id);
+        if (i >= 0) PRODUCTS[i] = { ...PRODUCTS[i], ...p };
+        else PRODUCTS.push(p);
+      });
+    },
     _replaceAll(data) {
       if (data && Array.isArray(data.products) && data.products.length) {
         PRODUCTS.length = 0;

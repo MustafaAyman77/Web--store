@@ -300,3 +300,10 @@ a.ad-alert:hover { filter: brightness(0.97); }
 .ad-pick input { width: 20px; height: 20px; accent-color: var(--brand-600, #16a34a); flex-shrink: 0; }
 .ad-pick small { color: var(--muted, #6b7280); }
 .ad-off { color: var(--brand-700, #15803d); }
+
+/* صفوف إحصاءات البحث */
+.ad-pad { padding: 8px 16px; }
+.ad-row-line { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px dashed var(--border, #e5e7eb); }
+.ad-row-line:last-child { border-bottom: none; }
+.ad-rank { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--bg-soft, #f1f5f9); color: var(--muted, #64748b); font-size: .8rem; display: flex; align-items: center; justify-content: center; }
+.ad-row-note { margin-inline-start: auto; color: var(--muted, #64748b); font-size: .85rem; white-space: nowrap; }

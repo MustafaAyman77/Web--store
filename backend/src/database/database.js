@@ -170,6 +170,19 @@ function migrate(database) {
   if (!itemCols.includes("discount_amount")) database.exec("ALTER TABLE order_items ADD COLUMN discount_amount REAL NOT NULL DEFAULT 0;");
   if (!itemCols.includes("promotion_id")) database.exec("ALTER TABLE order_items ADD COLUMN promotion_id TEXT;");
   if (!itemCols.includes("promotion_name")) database.exec("ALTER TABLE order_items ADD COLUMN promotion_name TEXT DEFAULT '';");
+  // --- المرحلة 13: أحداث البحث + فهارس البحث ---
+  database.exec(`CREATE TABLE IF NOT EXISTS search_events (
+    id TEXT PRIMARY KEY, customer_id TEXT REFERENCES customers(id),
+    query TEXT NOT NULL DEFAULT '', normalized_query TEXT NOT NULL DEFAULT '',
+    results_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')));`);
+  database.exec("CREATE INDEX IF NOT EXISTS idx_search_norm ON search_events(normalized_query);");
+  database.exec("CREATE INDEX IF NOT EXISTS idx_search_zero ON search_events(results_count, normalized_query);");
+  database.exec("CREATE INDEX IF NOT EXISTS idx_search_created ON search_events(created_at);");
+  database.exec("CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);");
+  database.exec("CREATE INDEX IF NOT EXISTS idx_products_available ON products(available);");
+  database.exec("CREATE INDEX IF NOT EXISTS idx_products_created ON products(created_at);");
+  database.exec("CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);");
   const adminCols = database.prepare("PRAGMA table_info(admins);").all().map((c) => c.name);
   if (!adminCols.includes("role")) {
     database.exec("ALTER TABLE admins ADD COLUMN role TEXT NOT NULL DEFAULT 'owner';");

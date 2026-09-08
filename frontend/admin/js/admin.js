@@ -1557,6 +1557,37 @@
     } // renderPromoForm
   }
 
+  /* ================= البحث: إحصاءات ================= */
+
+  async function pageSearch() {
+    setChrome("search");
+    document.title = "البحث | لوحة التحكم";
+    view.innerHTML = '<div class="ad-page-head"><div><h1>🔍 البحث</h1><p>أكثر ما يبحث عنه الزبائن — بدون أي بيانات شخصية.</p></div>' +
+      '<button type="button" class="ad-btn ad-btn-outline ad-btn-sm" id="srRefresh">🔄 تحديث</button></div>' + skel(3);
+    const row = (r, i) =>
+      '<div class="ad-row-line"><span class="ad-rank">' + (i + 1) + "</span><strong>" + esc(r.query) +
+      '</strong><span class="ad-row-note">× ' + r.count + "</span></div>";
+    try {
+      const d = await api("/admin/search/analytics");
+      view.innerHTML =
+        '<div class="ad-page-head"><div><h1>🔍 البحث</h1><p>أكثر ما يبحث عنه الزبائن — بدون أي بيانات شخصية.</p></div>' +
+        '<button type="button" class="ad-btn ad-btn-outline ad-btn-sm" id="srRefresh">🔄 تحديث</button></div>' +
+        '<div class="ad-stat-grid">' +
+        '<div class="ad-card ad-stat"><span class="n">' + d.totalSearches + '</span><span class="l">🔍 إجمالي عمليات البحث</span></div>' +
+        '<div class="ad-card ad-stat"><span class="n">' + d.uniqueQueries + '</span><span class="l">💬 كلمات مميزة</span></div>' +
+        '<div class="ad-card ad-stat"><span class="n">' + d.zeroRate + '%</span><span class="l">🕳️ نسبة صفر نتائج</span></div>' +
+        "</div>" +
+        '<h2 class="ad-section-title">🔥 الأكثر بحثًا</h2>' +
+        '<div class="ad-card ad-pad">' + (d.topQueries.length ? d.topQueries.map(row).join("") : stateHTML("🔍", "لا توجد بيانات بعد", "ستظهر هنا أكثر كلمات البحث.")) + "</div>" +
+        '<h2 class="ad-section-title">🕳️ بحث بدون نتائج</h2>' +
+        '<div class="ad-card ad-pad">' + (d.zeroResultQueries.length ? d.zeroResultQueries.map(row).join("") : stateHTML("✅", "ممتاز — لا يوجد بحث بدون نتائج", "كل عمليات البحث وجدت منتجات. 🎉")) + "</div>";
+      document.getElementById("srRefresh").addEventListener("click", () => pageSearch());
+    } catch (ex) {
+      view.innerHTML = stateHTML("⚠️", "تعذر تحميل إحصاءات البحث", ex.message || "", '<button type="button" class="ad-btn ad-btn-primary" id="retryBtn">إعادة المحاولة</button>');
+      document.getElementById("retryBtn").addEventListener("click", () => pageSearch());
+    }
+  }
+
   /* ================= التوجيه ================= */
 
   function render() {
@@ -1579,6 +1610,7 @@
     if (path === "/admin/settings") return void pageSettings();
     if (path === "/admin/delivery") return void pageDelivery();
     if (path === "/admin/promotions") return void pagePromotions();
+    if (path === "/admin/search") return void pageSearch();
     if (path === "/admin/promotions/new") return void pagePromoForm(null);
     if ((m = path.match(/^\/admin\/promotions\/(.+)\/edit$/))) return void pagePromoForm(decodeURIComponent(m[1]));
     setChrome("dashboard");

@@ -240,3 +240,20 @@ CREATE TABLE IF NOT EXISTS inventory_movements (
 );
 CREATE INDEX IF NOT EXISTS idx_movements_product ON inventory_movements(product_id);
 CREATE INDEX IF NOT EXISTS idx_movements_created ON inventory_movements(created_at);
+
+-- المرحلة 13: أحداث البحث (تحليلات بدون بيانات شخصية)
+CREATE TABLE IF NOT EXISTS search_events (
+  id               TEXT PRIMARY KEY,
+  customer_id      TEXT REFERENCES customers(id),
+  query            TEXT NOT NULL DEFAULT '',
+  normalized_query TEXT NOT NULL DEFAULT '',
+  results_count    INTEGER NOT NULL DEFAULT 0,
+  created_at       TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_search_norm ON search_events(normalized_query);
+CREATE INDEX IF NOT EXISTS idx_search_zero ON search_events(results_count, normalized_query);
+CREATE INDEX IF NOT EXISTS idx_search_created ON search_events(created_at);
+CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
+CREATE INDEX IF NOT EXISTS idx_products_available ON products(available);
+CREATE INDEX IF NOT EXISTS idx_products_created ON products(created_at);
+CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);

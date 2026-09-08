@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="css/components.css" />
   <link rel="stylesheet" href="css/sections.css" />
   <link rel="stylesheet" href="css/shop.css" />
+  <link rel="stylesheet" href="css/search.css" />
   <link rel="stylesheet" href="css/promos.css" />
 </head>
 <body>
@@ -80,8 +81,12 @@
         <div class="search-box">
           <span aria-hidden="true">🔍</span>
           <label class="visually-hidden" for="shopSearch">ابحث عن منتج</label>
-          <input type="search" id="shopSearch" placeholder="ابحث عن منتج..." autocomplete="off" />
+          <input type="search" id="shopSearch" placeholder="ابحث عن منتج... (جرّب: شيبسي)" autocomplete="off"
+            role="combobox" aria-expanded="false" aria-controls="searchDrop" aria-autocomplete="list" />
           <button type="button" class="search-clear" id="searchClear" aria-label="مسح البحث">✕</button>
+          <div class="search-drop" id="searchDrop" hidden>
+            <ul id="searchDropList" role="listbox" aria-label="اقتراحات البحث"></ul>
+          </div>
         </div>
         <div class="sort-wrap">
           <label for="shopSort">ترتيب حسب:</label>
@@ -95,6 +100,8 @@
 
       <div class="filter-row reveal" id="shopChips" role="tablist" aria-label="تصفح المنتجات حسب القسم"></div>
 
+      <div class="search-correct" id="searchCorrect" role="status" hidden></div>
+
       <div class="shop-layout">
         <aside class="filter-side" aria-label="فلاتر المنتجات">
           <h3 class="filter-side-title">🎛️ تصفية المنتجات</h3>
@@ -104,6 +111,9 @@
         <section aria-label="قائمة المنتجات" aria-live="polite">
           <p class="shop-count" id="shopCount" role="status"></p>
           <div class="product-grid" id="shopGrid"></div>
+          <div class="load-more-wrap" id="loadMoreWrap" hidden>
+            <button type="button" class="btn btn-outline btn-block" data-load-more>عرض المزيد</button>
+          </div>
         </section>
       </div>
     </div>
@@ -224,6 +234,7 @@
   <script src="js/cart.js"></script>
   <script src="js/api.js"></script>
   <script src="js/promos.js"></script>
+  <script src="js/search.js"></script>
   <script src="js/recs.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/store.js"></script>

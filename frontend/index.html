@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="css/layout.css" />
   <link rel="stylesheet" href="css/components.css" />
   <link rel="stylesheet" href="css/sections.css" />
+  <link rel="stylesheet" href="css/search.css" />
   <link rel="stylesheet" href="css/shop.css" />
   <link rel="stylesheet" href="css/promos.css" />
 </head>
@@ -81,6 +82,11 @@
               <span aria-hidden="true">🔥</span> شاهد العروض
             </a>
           </div>
+          <form class="hero-search" action="products.html" method="get" role="search">
+            <label class="visually-hidden" for="heroSearch">ابحث عن منتج</label>
+            <input type="search" id="heroSearch" name="q" placeholder="دوّر على أي منتج... (جرّب: شيبسي)" autocomplete="off" maxlength="60" />
+            <button type="submit" class="btn btn-light btn-lg"><span aria-hidden="true">🔍</span> دوّر</button>
+          </form>
           <ul class="hero-points">
             <li><i aria-hidden="true">✓</i> مفتوح 24 ساعة</li>
             <li><i aria-hidden="true">✓</i> في قلب مغاغة</li>
@@ -143,22 +149,6 @@
     </section>
 
     <!-- ===================== Featured products ===================== -->
-    <section class="section section-tint" id="products" aria-labelledby="productsTitle">
-      <div class="container">
-        <div class="section-head reveal">
-          <div>
-            <span class="kicker">المميز</span>
-            <h2 id="productsTitle">منتجات مميزة</h2>
-          </div>
-        </div>
-        <p class="demo-note reveal" role="note">
-          <span aria-hidden="true">💡</span>
-          المنتجات والأسعار المعروضة تجريبية لأغراض العرض، وسيتم تحديثها بالبيانات الحقيقية من المحل.
-        </p>
-        <div class="filter-row reveal" id="filterRow" role="tablist" aria-label="فلترة المنتجات حسب القسم"><!-- يُبنى من js/data.js --></div>
-        <div class="product-grid" id="productGrid"><!-- يُبنى من js/data.js --></div>
-      </div>
-    </section>
 
     <!-- ===================== Offers ===================== -->
     <section class="section" id="recPopular" aria-labelledby="recPopularTitle" hidden>
@@ -168,6 +158,18 @@
             <h2 id="recPopularTitle">الأكثر طلبًا من زبائننا</h2></div>
         </div>
         <div class="rec-grid" id="recPopularGrid"></div>
+      </div>
+    </section>
+    <section class="section offers-section" id="offers" aria-labelledby="offersTitle">
+      <div class="container">
+        <div class="section-head section-head-light reveal">
+          <div>
+            <span class="kicker kicker-light">🔥 عروض اليوم</span>
+            <h2 id="offersTitle">عروض توفرلك أكتر</h2>
+            <p class="section-desc">باقات مجمعة بسعر خاص — العروض تجريبية وقابلة للتغيير.</p>
+          </div>
+        </div>
+        <div class="offer-grid" id="offerGrid"><!-- يُبنى من js/data.js --></div>
       </div>
     </section>
 
@@ -190,17 +192,20 @@
         <div class="rec-grid" id="recPersonalGrid"></div>
       </div>
     </section>
-
-    <section class="section offers-section" id="offers" aria-labelledby="offersTitle">
+    <section class="section section-tint" id="products" aria-labelledby="productsTitle">
       <div class="container">
-        <div class="section-head section-head-light reveal">
+        <div class="section-head reveal">
           <div>
-            <span class="kicker kicker-light">🔥 عروض اليوم</span>
-            <h2 id="offersTitle">عروض توفرلك أكتر</h2>
-            <p class="section-desc">باقات مجمعة بسعر خاص — العروض تجريبية وقابلة للتغيير.</p>
+            <span class="kicker">المميز</span>
+            <h2 id="productsTitle">منتجات مميزة</h2>
           </div>
         </div>
-        <div class="offer-grid" id="offerGrid"><!-- يُبنى من js/data.js --></div>
+        <p class="demo-note reveal" role="note">
+          <span aria-hidden="true">💡</span>
+          المنتجات والأسعار المعروضة تجريبية لأغراض العرض، وسيتم تحديثها بالبيانات الحقيقية من المحل.
+        </p>
+        <div class="filter-row reveal" id="filterRow" role="tablist" aria-label="فلترة المنتجات حسب القسم"><!-- يُبنى من js/data.js --></div>
+        <div class="product-grid" id="productGrid"><!-- يُبنى من js/data.js --></div>
       </div>
     </section>
 
