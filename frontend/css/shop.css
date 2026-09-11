@@ -1,0 +1,284 @@
+/* ==========================================================================
+   أسواق البسيط — Shop: صفحة المنتجات + نافذة التفاصيل + شيت الفلاتر
+   يُحمَّل في كل الصفحات (نافذة التفاصيل مشتركة).
+   ========================================================================== */
+
+/* ---------------- رأس صفحة المنتجات ---------------- */
+.shop-page { padding-block: 1.6rem 2.6rem; }
+@media (min-width: 768px) { .shop-page { padding-block: 2.2rem 3.4rem; } }
+
+.crumbs { font-size: 0.82rem; color: var(--muted); margin-bottom: 0.6rem; }
+.crumbs a { color: var(--brand-700); font-weight: 700; }
+.crumbs a:hover { text-decoration: underline; }
+.crumbs span[aria-hidden="true"] { margin-inline: 0.35rem; color: var(--faint); }
+
+.shop-head h1 { font-size: clamp(1.5rem, 6vw, 2.2rem); color: var(--brand-900); }
+.shop-head > p { color: var(--muted); margin-top: 0.25rem; }
+.shop-head .demo-note { margin-top: 0.9rem; margin-bottom: 0; }
+
+/* ---------------- شريط الأدوات: بحث + ترتيب + تصفية ---------------- */
+.shop-toolbar {
+  display: grid;
+  gap: 0.7rem;
+  margin-block: 1.2rem 1rem;
+}
+@media (min-width: 768px) {
+  .shop-toolbar { grid-template-columns: 1fr auto auto; align-items: center; }
+}
+
+.search-box { position: relative; }
+.search-box > span[aria-hidden="true"] {
+  position: absolute;
+  inset-inline-start: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.1rem;
+  pointer-events: none;
+}
+.search-box input {
+  width: 100%;
+  min-height: 52px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  padding: 0.7rem 2.8rem 0.7rem 2.6rem;
+  padding-inline-start: 2.8rem;
+  padding-inline-end: 2.6rem;
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast);
+}
+.search-box input:focus {
+  outline: none;
+  border-color: var(--brand-500);
+  box-shadow: 0 0 0 3px rgb(34 197 94 / 0.15);
+}
+.search-clear {
+  position: absolute;
+  inset-inline-end: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 34px; height: 34px;
+  display: grid; place-items: center;
+  border-radius: 10px;
+  color: var(--faint);
+  font-size: 0.95rem;
+}
+.search-clear:hover { background: var(--bg); color: var(--danger-600); }
+
+.sort-wrap { display: flex; align-items: center; gap: 0.55rem; }
+.sort-wrap label { font-size: 0.85rem; font-weight: 800; color: var(--muted); white-space: nowrap; }
+.sort-select {
+  min-height: 52px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  padding: 0.6rem 0.9rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+  max-width: 100%;
+}
+.sort-select:focus { outline: none; border-color: var(--brand-500); box-shadow: 0 0 0 3px rgb(34 197 94 / 0.15); }
+
+.filter-open-btn { position: relative; }
+@media (min-width: 1024px) { .filter-open-btn { display: none; } }
+.filter-badge {
+  position: absolute;
+  top: -8px;
+  inset-inline-start: -8px;
+  min-width: 24px; height: 24px;
+  padding-inline: 6px;
+  display: inline-grid; place-items: center;
+  background: var(--accent-500);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--bg);
+}
+
+/* شرائح الأقسام في صفحة المنتجات */
+#shopChips { margin-bottom: 1rem; }
+
+/* ---------------- تخطيط المتجر: جانبي + شبكة ---------------- */
+.shop-layout { display: block; }
+@media (min-width: 1024px) {
+  .shop-layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 1.4rem;
+    align-items: start;
+  }
+}
+
+.filter-side {
+  display: none;
+  background: var(--card);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  padding: 1.2rem;
+  box-shadow: var(--shadow-sm);
+  position: sticky;
+  top: calc(var(--header-h) + 14px);
+  max-height: calc(100vh - var(--header-h) - 28px);
+  overflow-y: auto;
+}
+@media (min-width: 1024px) { .filter-side { display: block; } }
+.filter-side-title {
+  font-size: 1.05rem;
+  color: var(--brand-800);
+  padding-bottom: 0.7rem;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid var(--brand-100);
+}
+
+.shop-count {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 0.8rem;
+}
+
+/* ---------------- عناصر الفلاتر ---------------- */
+.f-group { margin-bottom: 1.15rem; }
+.f-group h4 { font-size: 0.9rem; margin-bottom: 0.6rem; color: var(--ink); }
+.f-cats { display: grid; gap: 0.15rem; max-height: 240px; overflow-y: auto; padding-inline-end: 0.2rem; }
+.radio-row, .check-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 0.45rem 0.5rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  min-height: 44px;
+}
+.radio-row:hover, .check-row:hover { background: var(--bg); }
+.radio-row input, .check-row input {
+  width: 19px; height: 19px;
+  accent-color: var(--brand-600);
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+.f-price-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.f-price-row label { font-size: 0.8rem; font-weight: 700; color: var(--muted); display: grid; gap: 0.3rem; }
+.f-price-row input {
+  width: 100%;
+  min-height: 48px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.75rem;
+  background: #fff;
+}
+.f-price-row input:focus { outline: none; border-color: var(--brand-500); box-shadow: 0 0 0 3px rgb(34 197 94 / 0.15); }
+.f-actions { display: grid; gap: 0.5rem; margin-top: 0.4rem; }
+
+/* ---------------- الشيت السفلي (موبايل/تابلت) ---------------- */
+.filter-sheet {
+  position: fixed;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 85;
+  background: var(--card);
+  border-radius: 22px 22px 0 0;
+  box-shadow: var(--shadow-lg);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  transform: translateY(105%);
+  transition: transform var(--dur-med) var(--ease);
+}
+.filter-sheet.show { transform: translateY(0); }
+.filter-sheet[hidden] { display: none; }
+@media (min-width: 1024px) { .filter-sheet { display: none; } }
+.sheet-handle { width: 46px; height: 5px; margin: 0.6rem auto 0; background: var(--border); border-radius: var(--radius-pill); }
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.7rem 1.2rem;
+  border-bottom: 1px solid var(--border-soft);
+}
+.sheet-head h3 { font-size: 1.05rem; }
+.sheet-body { padding: 1.1rem 1.2rem calc(1.4rem + env(safe-area-inset-bottom, 0px)); overflow-y: auto; }
+
+/* ---------------- حالة عدم وجود نتائج ---------------- */
+.shop-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  background: var(--card);
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius-lg);
+  padding: 2.6rem 1.5rem;
+}
+.shop-empty-icon { font-size: 3rem; display: block; margin-bottom: 0.7rem; }
+.shop-empty h3 { font-size: 1.1rem; margin-bottom: 0.3rem; }
+.shop-empty p { color: var(--muted); font-size: 0.9rem; margin-bottom: 1.1rem; }
+
+/* ---------------- هيكل التحميل (Skeleton) ---------------- */
+.skel { pointer-events: none; }
+.skel-block { background: linear-gradient(100deg, #e8efe8 40%, #f4f8f4 50%, #e8efe8 60%) !important; background-size: 200% 100% !important; animation: skelMove 1.2s infinite; }
+.skel-block::after { display: none; }
+.skel-line { height: 12px; border-radius: 6px; margin-top: 0.5rem; background: linear-gradient(100deg, #e8efe8 40%, #f4f8f4 50%, #e8efe8 60%); background-size: 200% 100%; animation: skelMove 1.2s infinite; }
+.skel-line.w60 { width: 60%; } .skel-line.w90 { width: 90%; } .skel-line.w40 { width: 40%; }
+@keyframes skelMove { to { background-position: -200% 0; } }
+
+/* ---------------- كارت غير المتوفر ---------------- */
+.product-card.is-unavailable .product-visual { filter: grayscale(0.85); opacity: 0.85; }
+.product-tag.is-off { background: #64748b; }
+.add-btn.is-disabled, .btn.is-disabled { background: var(--border); color: var(--muted); cursor: not-allowed; box-shadow: none; }
+
+/* زر فتح التفاصيل (الصورة/الاسم) */
+button.p-open { cursor: pointer; }
+button.product-visual { width: 100%; border: 0; font: inherit; }
+button.product-name { text-align: inherit; background: none; padding: 0; }
+button.product-name:hover { color: var(--brand-700); }
+
+/* ---------------- نافذة تفاصيل المنتج ---------------- */
+.product-modal .modal-card { max-width: 640px; }
+.pd-grid { display: grid; gap: 1.1rem; }
+@media (min-width: 560px) { .pd-grid { grid-template-columns: 0.9fr 1.1fr; } }
+
+.pd-visual {
+  position: relative;
+  border-radius: var(--radius-md);
+  min-height: 220px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--p1), var(--p2));
+  overflow: hidden;
+}
+.pd-visual .product-tag { position: absolute; top: 0.8rem; inset-inline-start: 0.8rem; }
+.pd-icon { font-size: 5rem; filter: drop-shadow(0 12px 14px rgb(0 0 0 / 0.18)); }
+
+.pd-info { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
+.pd-info h4 { font-size: 1.3rem; }
+.pd-desc { color: var(--muted); font-size: 0.92rem; }
+.pd-prices { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.price-lg { font-size: 1.6rem; }
+.pd-stock { font-weight: 800; font-size: 0.9rem; }
+.pd-stock.in { color: var(--brand-700); }
+.pd-stock.out { color: var(--danger-600); }
+
+.pd-buy { display: flex; gap: 0.7rem; align-items: stretch; margin-top: 0.4rem; flex-wrap: wrap; }
+.stepper-lg { padding: 4px; }
+.stepper-lg button { width: 42px; height: 42px; font-size: 1.25rem; }
+.stepper-lg b { min-width: 34px; font-size: 1.05rem; }
+.pd-add { flex: 1 1 180px; }
+
+.pd-related { margin-top: 1.3rem; padding-top: 1.1rem; border-top: 1px dashed var(--border); }
+.pd-related h5 { font-size: 1rem; margin-bottom: 0.8rem; color: var(--brand-800); }
+.related-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.7rem; }
+@media (min-width: 560px) { .related-grid { grid-template-columns: repeat(4, 1fr); } }
+.related-grid .product-desc, .related-grid .product-cat { display: none; }
+.related-grid .product-visual { font-size: 2.2rem; }
+.related-grid .product-name { font-size: 0.82rem; }
+.related-grid .price { font-size: 0.95rem; }
+
+/* ---------------- تحسينات ملخص السلة ---------------- */
+.cl-total { font-size: 0.82rem; font-weight: 800; color: var(--brand-800); }
+.total-row output.pending { font-size: 0.82rem; color: var(--accent-700); font-weight: 800; }
+.total-row.is-save output { color: var(--brand-600); font-weight: 800; }
+.delivery-hint { font-size: 0.76rem; color: var(--faint); margin-top: -0.4rem; }

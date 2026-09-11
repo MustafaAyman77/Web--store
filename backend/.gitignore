@@ -1,0 +1,16 @@
+# Secrets — لا تدخل Git أبدًا
+.env
+.env.local
+.env.*.local
+
+# قاعدة البيانات المحلية (تُبنى عبر npm run seed)
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/*.sqlite
+data/*.sqlite3
+
+# Dependencies & logs
+node_modules/
+npm-debug.log*
+*.log

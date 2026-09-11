@@ -1,0 +1,140 @@
+/* ==========================================================================
+   أسواق البسيط — حساب العميل + الدخول (المرحلة 9)
+   Mobile First • RTL • بسيط
+   ========================================================================== */
+
+.auth-link {
+  display: inline-flex; align-items: center; gap: 0.25rem;
+  font-weight: 800; font-size: 0.85rem; color: var(--brand-800);
+  background: var(--brand-50); border: 1px solid var(--brand-200);
+  border-radius: var(--radius-full); padding: 0.45rem 0.8rem;
+  text-decoration: none; white-space: nowrap;
+}
+.auth-link:hover { background: var(--brand-100); }
+
+.container-narrow { max-width: 480px; }
+
+.auth-card {
+  background: var(--card); border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg); padding: 1.5rem 1.2rem;
+  box-shadow: var(--shadow-sm); text-align: center;
+  margin-bottom: 1rem;
+}
+.auth-emoji { font-size: 2.4rem; }
+.auth-card h1 { font-size: 1.35rem; margin: 0.3rem 0; }
+.auth-sub { color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem; }
+.auth-field { text-align: start; margin-bottom: 0.9rem; }
+.auth-field label { display: block; font-weight: 800; font-size: 0.88rem; margin-bottom: 0.3rem; }
+.auth-field label small { font-weight: 400; color: var(--muted); font-size: 0.75rem; }
+.auth-field input {
+  width: 100%; min-height: 50px; padding: 0.6rem 0.8rem;
+  border: 1.5px solid var(--border); border-radius: var(--radius-md);
+  font: inherit; background: var(--bg);
+}
+.auth-field input:focus { outline: none; border-color: var(--brand-500); background: var(--card); }
+.auth-field input:disabled { opacity: 0.6; }
+.auth-alert {
+  background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;
+  border-radius: var(--radius-md); padding: 0.6rem 0.8rem;
+  font-size: 0.88rem; font-weight: 700; margin-bottom: 0.9rem;
+}
+.auth-alert.is-ok { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
+.auth-note { margin-top: 1rem; font-size: 0.85rem; color: var(--muted); }
+.link-btn { background: none; border: 0; color: var(--brand-700); font: inherit; font-weight: 800; cursor: pointer; padding: 0; }
+.link-btn:disabled { opacity: 0.45; cursor: default; }
+.auth-resend { margin-top: 0.8rem; font-size: 0.85rem; }
+
+/* ---------- صفحة الحساب ---------- */
+.acc-tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; overflow-x: auto; }
+.acc-tab {
+  flex: 1; text-align: center; font-weight: 800; font-size: 0.88rem;
+  padding: 0.6rem 0.5rem; border-radius: var(--radius-md);
+  background: var(--card); border: 1px solid var(--border-soft);
+  color: inherit; text-decoration: none; white-space: nowrap;
+}
+.acc-tab.is-active { background: var(--brand-600); color: #fff; border-color: var(--brand-600); }
+.acc-hero h1 { font-size: 1.4rem; margin-bottom: 0.2rem; }
+.acc-hero p { color: var(--muted); margin-bottom: 1rem; }
+.acc-card {
+  background: var(--card); border: 1px solid var(--border-soft);
+  border-radius: var(--radius-lg); padding: 1.1rem;
+  box-shadow: var(--shadow-sm); margin-bottom: 1rem;
+}
+.acc-card h1 { font-size: 1.2rem; margin-bottom: 0.8rem; }
+.acc-card h2 { font-size: 1.05rem; margin-bottom: 0.7rem; }
+.acc-muted { color: var(--muted); font-size: 0.85rem; }
+.acc-note { margin-top: 0.6rem; }
+.acc-error { color: #b91c1c; font-weight: 700; }
+.acc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; margin-bottom: 1rem; }
+.acc-tile {
+  background: var(--card); border: 1px solid var(--border-soft);
+  border-radius: var(--radius-md); padding: 0.8rem 0.4rem;
+  display: flex; flex-direction: column; gap: 0.15rem; align-items: center;
+  font-size: 1.4rem; text-decoration: none; color: inherit;
+}
+.acc-tile b { font-size: 0.85rem; }
+.acc-tile small { font-size: 0.72rem; color: var(--muted); }
+.acc-order-card {
+  display: flex; justify-content: space-between; align-items: center; gap: 0.6rem;
+  border: 1px solid var(--border-soft); border-radius: var(--radius-md);
+  padding: 0.7rem 0.8rem; margin-bottom: 0.6rem;
+  text-decoration: none; color: inherit;
+}
+.acc-order-card p { margin: 0.15rem 0 0; }
+.acc-total { font-weight: 900; color: var(--brand-800); margin-top: 0.3rem !important; }
+.acc-status {
+  display: inline-block; font-size: 0.75rem; font-weight: 800;
+  padding: 0.2rem 0.6rem; border-radius: var(--radius-full);
+  background: var(--brand-50); color: var(--brand-800); white-space: nowrap;
+}
+.acc-status.st-cancelled { background: #fef2f2; color: #b91c1c; }
+.acc-status.st-completed { background: #f0fdf4; color: #15803d; }
+.acc-timeline { list-style: none; margin: 0.8rem 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.acc-timeline li { color: var(--muted); font-size: 0.9rem; }
+.acc-timeline li.is-done { color: var(--brand-700); font-weight: 700; }
+.acc-timeline li.is-now { color: var(--brand-800); font-weight: 900; }
+.acc-cancelled { background: #fef2f2; border: 1px solid #fecaca; border-radius: var(--radius-md); padding: 0.7rem; font-size: 0.88rem; margin: 0.8rem 0; }
+.acc-items { margin: 0.8rem 0; }
+.acc-items .summary-line, .acc-items .summary-total { padding: 0.35rem 0; }
+.acc-recent { display: flex; flex-direction: column; gap: 0.5rem; }
+.acc-recent-item { display: flex; align-items: center; gap: 0.7rem; border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 0.5rem 0.6rem; }
+.acc-recent-item > div { flex: 1; min-width: 0; }
+.acc-recent-item b { font-size: 0.85rem; display: block; }
+.acc-recent-item p { margin: 0; font-size: 0.8rem; color: var(--brand-800); font-weight: 800; }
+.acc-recent-icon { font-size: 1.7rem; }
+.acc-recent-item .add-btn { min-height: 40px; padding: 0.3rem 0.9rem; font-size: 0.8rem; }
+.btn-danger-outline { background: transparent; border: 1.5px solid #fca5a5; color: #b91c1c; margin-top: 0.6rem; }
+.btn-danger-outline:hover { background: #fef2f2; }
+
+/* ---------- دعوة إنشاء الحساب (صفحة النجاح) ---------- */
+.acc-invite {
+  margin-top: 1rem; background: var(--brand-50); border: 1.5px dashed var(--brand-300);
+  border-radius: var(--radius-lg); padding: 1rem;
+}
+.acc-invite p { font-weight: 700; font-size: 0.92rem; margin-bottom: 0.7rem; }
+.acc-invite-row { display: flex; gap: 0.6rem; }
+.acc-invite-row .btn { flex: 1; }
+
+/* ---------------- الجرس + التتبع (المرحلة 10) ---------------- */
+.notif-bell { position: relative; display: inline-grid; place-items: center; width: 42px; height: 42px; font-size: 1.25rem; text-decoration: none; background: var(--brand-50); border: 1px solid var(--brand-200); border-radius: var(--radius-full); }
+.notif-count { position: absolute; top: -4px; inset-inline-end: -4px; min-width: 20px; height: 20px; padding: 0 5px; background: #dc2626; color: #fff; font-size: 0.7rem; font-weight: 900; border-radius: var(--radius-full); display: grid; place-items: center; }
+.notif-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.7rem; }
+.notif-head h1 { margin: 0; }
+.notif-item { display: block; width: 100%; text-align: start; background: var(--bg); border: 1px solid var(--border-soft); border-radius: var(--radius-md); padding: 0.7rem 0.8rem; margin-bottom: 0.55rem; cursor: pointer; font: inherit; color: inherit; }
+.notif-item b { display: block; font-size: 0.9rem; }
+.notif-item p { margin: 0.2rem 0; font-size: 0.83rem; color: var(--muted); }
+.notif-item.is-unread { background: var(--brand-50); border-color: var(--brand-200); }
+.notif-item.is-unread b::before { content: "🔴 "; font-size: 0.6rem; }
+.notif-empty { text-align: center; padding: 2rem 1rem; color: var(--muted); }
+.notif-empty span { font-size: 2.2rem; display: block; margin-bottom: 0.5rem; }
+.notif-skel { height: 64px; border-radius: var(--radius-md); background: linear-gradient(90deg, var(--border-soft) 25%, var(--bg) 50%, var(--border-soft) 75%); background-size: 200% 100%; animation: skelShimmer 1.2s infinite; margin-bottom: 0.55rem; }
+@keyframes skelShimmer { to { background-position: -200% 0; } }
+.track-banner { background: var(--brand-50); border: 1.5px solid var(--brand-300); color: var(--brand-900); font-weight: 900; text-align: center; border-radius: var(--radius-md); padding: 0.7rem; margin-bottom: 0.8rem; font-size: 0.95rem; }
+.track-banner.is-done { background: #f0fdf4; border-color: #86efac; color: #15803d; }
+.track-banner.is-cancelled { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+.track-history { margin: 0.8rem 0; }
+.track-history h3 { font-size: 0.95rem; margin-bottom: 0.4rem; }
+.track-history ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.track-history li { display: flex; justify-content: space-between; gap: 0.5rem; font-size: 0.83rem; border-bottom: 1px dashed var(--border-soft); padding-bottom: 0.3rem; }
+.track-history li span { color: var(--muted); white-space: nowrap; }
+.track-live { text-align: center; font-size: 0.78rem; color: var(--muted); margin: 0.6rem 0; }

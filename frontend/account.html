@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>حسابي | أسواق البسيط</title>
+  <meta name="description" content="حسابك في أسواق البسيط — بياناتك وطلباتك وإعادة الطلب." />
+  <meta name="theme-color" content="#15803d" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2316a34a'/%3E%3Cpath d='M16 20h8l4 16h16l4-12H24' stroke='white' stroke-width='4' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='28' cy='46' r='3.4' fill='white'/%3E%3Ccircle cx='42' cy='46' r='3.4' fill='white'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/variables.css" />
+  <link rel="stylesheet" href="css/base.css" />
+  <link rel="stylesheet" href="css/layout.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link rel="stylesheet" href="css/sections.css" />
+  <link rel="stylesheet" href="css/shop.css" />
+  <link rel="stylesheet" href="css/checkout.css" />
+  <link rel="stylesheet" href="css/account.css" />
+</head>
+<body>
+
+  <!-- ===================== Header ===================== -->
+  <header class="site-header" id="siteHeader">
+    <div class="container header-inner">
+      <a class="brand" href="index.html" aria-label="أسواق البسيط — الصفحة الرئيسية">
+        <span class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="9" cy="20" r="1.6" fill="currentColor" stroke="none"/>
+            <circle cx="17" cy="20" r="1.6" fill="currentColor" stroke="none"/>
+            <path d="M2 3h3l2.6 12.2a1.5 1.5 0 0 0 1.5 1.2h8.9a1.5 1.5 0 0 0 1.5-1.2L21.5 7H6"/>
+          </svg>
+        </span>
+        <span class="brand-text">
+          <strong>أسواق البسيط</strong>
+          <small>شارع الحجاز &bull; مغاغة</small>
+        </span>
+      </a>
+
+      <nav class="main-nav" aria-label="التنقل الرئيسي">
+        <a href="index.html" class="nav-link">الرئيسية</a>
+        <a href="products.html" class="nav-link">المنتجات</a>
+        <a href="offers.html" class="nav-link">العروض <i class="nav-fire" aria-hidden="true">🔥</i></a>
+        <a href="index.html#location" class="nav-link">المحل</a>
+      </nav>
+
+      <div class="header-actions">
+        <span class="open-pill" aria-label="المحل مفتوح 24 ساعة">
+          <i class="pulse-dot" aria-hidden="true"></i>
+          مفتوح 24 ساعة
+        </span>
+        <a class="auth-link" data-auth-link href="login.html">🔑 دخول</a>
+        <button class="cart-btn" id="cartOpenBtn" aria-label="فتح سلة المشتريات">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="9" cy="20" r="1.6" fill="currentColor" stroke="none"/>
+            <circle cx="17" cy="20" r="1.6" fill="currentColor" stroke="none"/>
+            <path d="M2 3h3l2.6 12.2a1.5 1.5 0 0 0 1.5 1.2h8.9a1.5 1.5 0 0 0 1.5-1.2L21.5 7H6"/>
+          </svg>
+          <span class="cart-count" id="cartCount">0</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="co-page">
+    <div class="container">
+      <nav class="crumbs" aria-label="مسار الصفحة">
+        <a href="index.html">الرئيسية</a>
+        <span aria-hidden="true">←</span>
+        <span aria-current="page">حسابي</span>
+      </nav>
+      <div id="accountRoot" aria-live="polite"></div>
+    </div>
+  </main>
+
+  <!-- ===================== Footer ===================== -->
+  <footer class="site-footer">
+    <div class="container footer-grid">
+      <div class="footer-brand">
+        <div class="brand brand-light">
+          <span class="brand-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="9" cy="20" r="1.6" fill="currentColor" stroke="none"/>
+              <circle cx="17" cy="20" r="1.6" fill="currentColor" stroke="none"/>
+              <path d="M2 3h3l2.6 12.2a1.5 1.5 0 0 0 1.5 1.2h8.9a1.5 1.5 0 0 0 1.5-1.2L21.5 7H6"/>
+            </svg>
+          </span>
+          <span class="brand-text"><strong>أسواق البسيط</strong></span>
+        </div>
+        <p class="footer-tagline">كل احتياجاتك... في مكان واحد</p>
+        <p class="footer-about">سوبر ماركت في شارع الحجاز، مدينة مغاغة — محافظة المنيا. مفتوح 24 ساعة لخدمتك في أي وقت.</p>
+      </div>
+      <nav class="footer-col" aria-label="روابط سريعة">
+        <h4>روابط سريعة</h4>
+        <a href="index.html">الرئيسية</a>
+        <a href="products.html">المنتجات</a>
+        <a href="offers.html">العروض</a>
+        <button type="button" class="footer-link-btn" data-open-cart>السلة</button>
+      </nav>
+      <div class="footer-col" aria-label="تواصل معنا">
+        <h4>تواصل معنا</h4>
+        <p class="contact-row"><span aria-hidden="true">📞</span> رقم الهاتف: <em>سيتم إضافته لاحقًا</em></p>
+        <p class="contact-row"><span aria-hidden="true">💬</span> WhatsApp: <em>سيتم إضافته لاحقًا</em></p>
+        <p class="contact-row"><span aria-hidden="true">📘</span> Facebook: <em>سيتم إضافته لاحقًا</em></p>
+        <p class="contact-row"><span aria-hidden="true">📸</span> Instagram: <em>سيتم إضافته لاحقًا</em></p>
+      </div>
+      <div class="footer-col" aria-label="العنوان وساعات العمل">
+        <h4>العنوان وساعات العمل</h4>
+        <p class="contact-row"><span aria-hidden="true">📍</span> شارع الحجاز — مغاغة — المنيا</p>
+        <p class="contact-row"><span aria-hidden="true">🕐</span> 24 ساعة طوال أيام الأسبوع</p>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="container footer-bottom-inner">
+        <p>© <span id="year">2026</span> أسواق البسيط — جميع الحقوق محفوظة</p>
+        <p class="footer-demo">نسخة عرض تجريبية</p>
+      </div>
+    </div>
+  </footer>
+
+  <!-- ===================== Mobile bottom navigation ===================== -->
+  <nav class="bottom-nav" aria-label="تنقل الهاتف">
+    <a href="index.html" class="bn-item" data-nav="home">
+      <span class="bn-icon" aria-hidden="true">🏠</span><span class="bn-label">الرئيسية</span>
+    </a>
+    <a href="products.html" class="bn-item" data-nav="products">
+      <span class="bn-icon" aria-hidden="true">🛒</span><span class="bn-label">المنتجات</span>
+    </a>
+    <a href="offers.html" class="bn-item" data-nav="offers">
+      <span class="bn-icon" aria-hidden="true">🔥</span><span class="bn-label">العروض</span>
+    </a>
+    <button type="button" class="bn-item" id="bottomCartBtn" data-nav="cart" aria-label="فتح سلة المشتريات">
+      <span class="bn-icon bn-cart" aria-hidden="true">🛍️<i class="cart-count" id="cartCountMobile">0</i></span><span class="bn-label">السلة</span>
+    </button>
+    <a href="index.html#location" class="bn-item" data-nav="location">
+      <span class="bn-icon" aria-hidden="true">📍</span><span class="bn-label">المحل</span>
+    </a>
+  </nav>
+
+  <!-- ===================== Cart drawer ===================== -->
+  <div class="overlay" id="overlay" hidden></div>
+  <aside class="cart-drawer" id="cartDrawer" role="dialog" aria-modal="true" aria-label="سلة مشترياتك" hidden>
+    <div class="drawer-head">
+      <h3>سلة مشترياتك 🛍️ <span class="drawer-count" id="drawerCount">(0)</span></h3>
+      <button type="button" class="icon-btn" id="cartCloseBtn" aria-label="إغلاق السلة">✕</button>
+    </div>
+    <div class="drawer-body" id="cartItems"></div>
+    <div class="drawer-foot" id="cartFoot"></div>
+  </aside>
+
+  <!-- ===================== Toasts ===================== -->
+  <div class="toast-wrap" id="toastWrap" aria-live="polite" aria-atomic="false"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/cart.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/promos.js"></script>
+  <script src="js/recs.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/notif.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/account.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
